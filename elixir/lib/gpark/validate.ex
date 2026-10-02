@@ -135,6 +135,11 @@ defmodule Gpark.Validate do
     end)
   end
 
+  # Deliberately narrow: only an explicit `exit` is a hazard. A kernel with an
+  # early-return block and a `done` block legitimately contains several `ret`s and
+  # PTX is perfectly happy with that, so counting returns would fire on correct
+  # code. Multiple `exit`s, by contrast, really do mean divergent threads are being
+  # torn down twice.
   defp note_exit(%{base: "exit"}, ctx) do
     issue(ctx, :multiple_exits, "kernel contains more than one exit")
   end
@@ -242,14 +247,53 @@ defmodule Gpark.Validate do
         ctx
       end
 
-    if is_list(spec.spaces) and instr.space not in spec.spaces do
-      issue(
-        ctx,
-        :bad_space,
-        "#{instr.base} does not support address space #{inspect(instr.space)}",
-        block.label,
-        index
-      )
+    ctx =
+      if is_list(spec.spaces) and instr.space not in spec.spaces do
+        issue(
+          ctx,
+          :bad_space,
+          "#{instr.base} does not support address space #{inspect(instr.space)}",
+          block.label,
+          index
+        )
+      else
+        ctx
+      end
+
+    check_operand_types(ctx, spec, instr, block, index)
+  end
+
+  # The `otypes` column was documented in `Gpark.Ops` but never enforced, so the
+  # table quietly disagreed with the checker. `:same` means every typed register
+  # operand must match the opcode's own type — this is what catches `add.u32`
+  # quietly operating on an f32 register.
+  defp check_operand_types(ctx, spec, instr, block, index) do
+    allowed =
+      case spec.otypes do
+        :same -> spec.dtype
+        :any -> nil
+        :sreg -> nil
+        list -> list
+      end
+
+    if allowed do
+      Enum.reduce(instr.ops, ctx, fn
+        {:reg, type, _id}, ctx ->
+          if type in allowed do
+            ctx
+          else
+            issue(
+              ctx,
+              :operand_type_mismatch,
+              "#{instr.base}.#{inspect(instr.dtype)} does not accept a #{inspect(type)} operand (allowed: #{inspect(allowed)})",
+              block.label,
+              index
+            )
+          end
+
+        _op, ctx ->
+          ctx
+      end)
     else
       ctx
     end

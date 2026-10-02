@@ -64,7 +64,7 @@ defmodule Gpark.Ops do
     {"brev", [:name, :dtype], @int_all, 1, 1, :same, []},
 
     # 32-bit widening helpers — the backbone of 64-bit address arithmetic.
-    {"mul.wide", [:name, :dtype], [:u32, :s32], 1, 2, :int32, [sync: true]},
+    {"mul.wide", [:name, :dtype], [:u32, :s32], 1, 2, [:u32, :s32], [sync: true]},
     {"mad.lo", [:name, :dtype], @int_all, 1, 3, :same, [sync: true]},
     {"mad.hi", [:name, :dtype], @int_all, 1, 3, :same, [sync: true]},
 
@@ -73,9 +73,9 @@ defmodule Gpark.Ops do
     # are the same opcodes as the integer ones. Only `fma` needs a modifier.
     {"fma", [:name, :modifier, :dtype], @floats, 1, 3, @floats,
      [sync: true, modifiers: ["rn", "approx"]]},
-    {"rcp", [:name, :dtype], [:f32, :f64], 1, 1, :floats, [sync: true]},
-    {"rsqrt", [:name, :dtype], [:f32], 1, 1, :floats, [sync: true]},
-    {"sqrt", [:name, :dtype], [:f32, :f64], 1, 1, :floats, [sync: true]},
+    {"rcp", [:name, :dtype], [:f32, :f64], 1, 1, @floats, [sync: true]},
+    {"rsqrt", [:name, :dtype], [:f32], 1, 1, @floats, [sync: true]},
+    {"sqrt", [:name, :dtype], [:f32, :f64], 1, 1, @floats, [sync: true]},
 
     # comparison and predication
     {"setp", [:name, :modifier, :dtype], @mem_types, 1, 2, :same,

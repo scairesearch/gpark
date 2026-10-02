@@ -261,6 +261,12 @@ defmodule Gpark.IR do
 
   defp operand_regs({:reg, type, id}), do: [{type, reg_class(type), id}]
   defp operand_regs({:pred, id}), do: [{:pred, :p, id}]
+
+  # Addresses carry registers too. `Gpark.Validate.read_ids/1` already recursed
+  # here, so emitter and validator disagreed about what a kernel touches: a base
+  # register used only inside `[base+idx]` would validate and then be missing from
+  # the `.reg` declarations, which ptxas rejects.
+  defp operand_regs({:addr, base, idx, _scale}), do: operand_regs(base) ++ operand_regs(idx)
   defp operand_regs(_), do: []
 
   @doc "Highest register id used per class, as a `%{class => id}` map."

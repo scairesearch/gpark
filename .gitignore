@@ -1,8 +1,15 @@
+# Build artefacts, matched at any depth: gpark's own tree and any nested project
+# in this workspace (e.g. riscgp/) have their own _build/deps directories, and a
+# top-level-only pattern silently leaves the nested ones tracked.
+**/_build/
+**/deps/
+**/doc/
+**/cover/
+**/.elixir_ls/
+**/node_modules/
 elixir/_build/
 elixir/deps/
-elixir/doc/
-elixir/cover/
-elixir/.elixir_ls/
+
 *.ez
 *.cubin
 *.sass

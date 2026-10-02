@@ -1,0 +1,33 @@
+[project]
+name = "gpark"
+version = "0.1.0.dev0"
+description = "Hand-written PTX kernels for quant, ML, RL and agentic workloads"
+readme = "README.md"
+requires-python = ">=3.11"
+license = "AGPL-3.0-or-later"
+keywords = ["gpu", "ptx", "cuda", "quant", "triton", "cupy"]
+classifiers = [
+  "Development Status :: 2 - Pre-Alpha",
+  "Intended Audience :: Developers",
+  "Programming Language :: Python :: 3",
+  "Topic :: Scientific/Engineering",
+]
+
+# No runtime dependencies on purpose. A tool whose whole claim is "the PTX we
+# emit is the PTX we mean" cannot afford to have a dependency decide what it emits.
+dependencies = []
+
+[project.urls]
+Homepage = "https://github.com/gpark/gpark"
+Source = "https://github.com/gpark/gpark"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["gpark"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
