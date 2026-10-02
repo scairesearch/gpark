@@ -148,6 +148,44 @@ distinguishable from a rule that does not exist — the distinction that caught 
 On the current corpus every rule reports zero: the four kernels are hand-minimal.
 That is a claim worth keeping honest, and `simplify_test.exs` asserts it.
 
+### `Gpark.DSL` — the elementwise front end
+
+`elementwise/2` owns the boilerplate that is not the arithmetic: loading parameters
+out of the driver bank, computing a thread index, establishing a `index >= count`
+guard, turning an element index into one shared byte offset, and emitting the
+epilogue block the guard branches to. The body gets a typed scope and writes the
+arithmetic itself.
+
+Two decisions are load-bearing:
+
+- **The scope is threaded as an argument, not hidden in process state.** `load(k, :a)`
+  costs one more token than `k.load(:a)` and buys re-entrant construction: a kernel can
+  be built twice in one process, and a raising body leaves no half-built builder
+  behind. Note that `k.load(:a)` could not work anyway — `k` is a map, so that
+  compiles to `apply(k, :load, ...)`.
+- **Registers are allocated monotonically per class, with no reuse.** gpark's premise
+  is that register pressure is the lever on a memory-bound kernel, so an allocator
+  that recycled a register across a `.bar.sync` would destroy the thing the user is
+  trying to control.
+
+The correctness argument is not that the DSL agrees with itself. It is that
+`dsl_test.exs` builds `vec_add_f32` through the DSL and asserts equality with the
+hand-written `Gpark.Kernels.VecAddF32` IR *and* byte equality with its golden PTX.
+That is what caught the two bugs worth recording:
+
+- The byte offset used `Gpark.Type.width/1`, which returns **bits**. `f32` produced
+  `mul.wide %rd, %r, 32`, striding 8× too far. Every access would have been in
+  bounds or out of it for reasons unrelated to the kernel's logic.
+- All pointers shared one address, emitting `[%rd4]` instead of `[%rd1+%rd4]` — a load
+  from absolute address 4. The byte offset is genuinely shareable across pointers;
+  the *base* is not, and conflating the two is invisible until you diff against a
+  golden.
+
+Neither was caught by the validator. Both passed `Gpark.Validate` and
+`Gpark.Backend.require!/2` cleanly, because both are structurally valid PTX that
+computes the wrong addresses. That is the argument for byte-level goldens over
+"it type-checks".
+
 ## Kernels
 
 Four, and the rule for adding one is that it must force something new in the

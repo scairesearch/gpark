@@ -104,9 +104,16 @@ memory, not a desire to have it.
 
 Sequenced so each layer is provable before the one above it exists.
 
-- [ ] `Gpark.DSL` — a Triton-shaped front end: blocked tensors, tile shapes,
-      `tl.load`/`tl.store`/`tl.dot`. Blocked on the IR settling, because a DSL
-      written against a moving IR gets rewritten rather than extended.
+- [x] `Gpark.DSL.elementwise/2` — a deliberately thin front end for the shape of
+      kernel gpark was writing by hand: parameter loads, thread index, bounds guard,
+      shared byte offset, epilogue block. Verified by reproducing the hand-written
+      `vec_add_f32` IR *and* its golden PTX byte for byte, which is a stronger claim
+      than "the DSL agrees with itself".
+- [ ] `Gpark.DSL` beyond elementwise — Triton-shaped front end: blocked tensors,
+      tile shapes, `tl.load`/`tl.store`/`tl.dot`. Deliberately not started yet: a DSL
+      written against a moving IR gets rewritten rather than extended, and the
+      elementwise slice exists to find out which parts of the surface are load-bearing
+      before the blocked ones are built on top.
 - [ ] Legalisation and lowering — DSL ops to the four kernel families above.
 - [ ] `Gpark.Runtime` — `Array`, caching `MemPool`, `Stream`, `Event`.
 - [ ] `Gpark.Graph` — capture, instantiate, update. The measured win is already
