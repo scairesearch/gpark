@@ -3,6 +3,7 @@
 # not agree with is a failure, not a detail.
 PYTHON ?= python3
 ELIXIR := elixir
+PYTHON_DIR := python
 
 .PHONY: test test-elixir test-python corpus format check clean help
 
@@ -17,8 +18,8 @@ test-elixir: ## Elixir: format check, warnings-as-errors, tests
 	cd $(ELIXIR) && mix test
 
 test-python: ## Python: compile check, tests (incl. the cross-impl. corpus check)
-	$(PYTHON) -m compileall -q gpark tests
-	$(PYTHON) -m unittest discover -s tests -t . -v
+	cd $(PYTHON_DIR) && $(PYTHON) -m compileall -q gpark tests
+	cd $(PYTHON_DIR) && $(PYTHON) -m unittest discover -s tests -t . -v
 
 corpus: ## Regenerate corpus specs and goldens from the Elixir kernels
 	cd $(ELIXIR) && mix run -e '
@@ -31,7 +32,7 @@ corpus: ## Regenerate corpus specs and goldens from the Elixir kernels
 
 format: ## Format both implementations
 	cd $(ELIXIR) && mix format
-	$(PYTHON) -m ruff format gpark tests 2>/dev/null || true
+	cd $(PYTHON_DIR) && $(PYTHON) -m ruff format gpark tests 2>/dev/null || true
 
 check: test ## Alias for test
 
