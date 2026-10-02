@@ -53,7 +53,16 @@ _NATIVE: dict[str, tuple[int, str, str]] = {
 }
 
 # s2/u2/s4/u4 are not PTX types at all; their width is implied by the name.
-_SUB_BYTE: dict[str, int] = {"s2": 2, "u2": 2, "s4": 4, "u4": 4}
+# s2/u2/s4/u4 have no direct PTX spelling, so they are deliberately absent from
+# _NATIVE -- that absence is what stops the backend believing `u4` is arithmetic.
+# They still carry (bits, kind, sign), because a packed element type that cannot
+# answer width, kind or sign is not much of a type.
+_SUB_BYTE: dict[str, tuple[int, str, str]] = {
+    "s2": (2, "int", "signed"),
+    "u2": (2, "int", "unsigned"),
+    "s4": (4, "int", "signed"),
+    "u4": (4, "int", "unsigned"),
+}
 
 # The native type a sub-byte element widens to before arithmetic. Widening to the
 # smallest type that holds every value avoids a redundant shift afterwards, and
@@ -103,31 +112,69 @@ def native(type_name: object) -> bool:
 
 def sub_byte_width(type_name: object) -> int | None:
     """Element width of a sub-byte type, or None if it is not one."""
-    if isinstance(type_name, str):
-        return _SUB_BYTE.get(type_name)
-    if isinstance(type_name, Packed):
-        return _SUB_BYTE.get(type_name.elem)
-    return None
+    entry = _SUB_BYTE.get(type_name) or (
+        _SUB_BYTE.get(type_name.elem) if isinstance(type_name, Packed) else None
+    )
+    return entry[0] if entry else None
+
+
+def describe(type_name: object) -> tuple[int, str, str] | None:
+    """The ``(bits, kind, sign)`` description of a type, or None.
+
+    Checks ``_NATIVE`` first, then ``_SUB_BYTE``. Funnelling ``width``, ``kind`` and
+    ``sign`` through one lookup means they cannot disagree about what a type is --
+    each used to consult ``_NATIVE`` alone, so every sub-byte type answered None
+    from all three and ``s4`` was indistinguishable from a typo.
+    """
+    if not isinstance(type_name, str):
+        return None
+    return _NATIVE.get(type_name) or _SUB_BYTE.get(type_name)
 
 
 def width(type_name: object) -> int | None:
-    """Storage width in bits. None for packed types, which have no single width."""
+    """Width in bits. None for packed values, which have no single width."""
     if isinstance(type_name, Packed):
         return None
-    entry = _NATIVE.get(type_name) if isinstance(type_name, str) else None
+    entry = describe(type_name)
     return entry[0] if entry else None
 
 
 def kind(type_name: object) -> str | None:
     """One of ``int``, ``bit``, ``float``, ``pred``."""
-    entry = _NATIVE.get(type_name) if isinstance(type_name, str) else None
+    entry = describe(type_name)
     return entry[1] if entry else None
 
 
+def sign(type_name: object) -> str | None:
+    """``"signed"``, ``"unsigned"``, or None."""
+    entry = describe(type_name)
+    return entry[2] if entry else None
+
+
 def is_signed(type_name: object) -> bool:
-    """True for types with a sign bit. Unlike integers, ``.u32`` is also a float."""
-    entry = _NATIVE.get(type_name) if isinstance(type_name, str) else None
-    return bool(entry and entry[2] == "signed")
+    """True for types with a sign *bit*. Note that floats qualify too; see
+    :func:`signed_int` for the integer-only question."""
+    return sign(type_name) == "signed"
+
+
+def signed_int(type_name: object) -> bool:
+    """True for signed *integers*, including packed sub-byte ones.
+
+    Deliberately not ``is_signed``: ``f32`` has a sign bit but is not a signed
+    integer, and conflating the two makes a float compare pick a signed modifier.
+    """
+    entry = describe(type_name)
+    if entry is None and isinstance(type_name, Packed):
+        entry = describe(type_name.elem)
+    return entry is not None and entry[1] == "int" and entry[2] == "signed"
+
+
+def unsigned_int(type_name: object) -> bool:
+    """True for unsigned *integers*, including packed sub-byte ones."""
+    entry = describe(type_name)
+    if entry is None and isinstance(type_name, Packed):
+        entry = describe(type_name.elem)
+    return entry is not None and entry[1] == "int" and entry[2] == "unsigned"
 
 
 def widen(type_name: str | Packed) -> str:

@@ -14,6 +14,7 @@ import unittest
 from pathlib import Path
 
 from gpark import decode_spec, emit, encode_spec, ops
+from gpark import type as type_mod
 from gpark.validate import check
 
 REPO = Path(__file__).resolve().parents[2]
@@ -113,6 +114,52 @@ class TestCorpus(unittest.TestCase):
         if elixir is None:
             self.skipTest("Elixir toolchain unavailable; cannot cross-check the ops table")
         self.assertEqual(ops.digest(), elixir.strip(), "opcode tables have drifted")
+
+    def test_type_sets_have_not_drifted_from_elixir(self):
+        # The digest above covers opcodes but not types, which is how `s2 u2 s4 u4`
+        # could sit in the Elixir tables, be used by its doctests, and be absent from
+        # the introspection functions -- a type-level drift the opcode digest is blind
+        # to by construction.
+        elixir = _elixir_types()
+        if elixir is None:
+            self.skipTest("Elixir toolchain unavailable; cannot cross-check types")
+        self.assertEqual(type_mod.all_types(), elixir, "type sets have drifted")
+
+    def test_subbyte_types_are_introspectable(self):
+        # The specific failure this guards: `width`, `kind` and `sign` each consulted
+        # only the native table, so every sub-byte type answered nil and `s4` was
+        # indistinguishable from a typo.
+        for name, sign in (("s2", "signed"), ("u2", "unsigned"),
+                           ("s4", "signed"), ("u4", "unsigned")):
+            self.assertEqual(type_mod.width(name), int(name[1:]))
+            self.assertEqual(type_mod.kind(name), "int")
+            self.assertEqual(type_mod.sign(name), sign)
+
+        # No direct PTX spelling -- that absence is the whole reason the type exists.
+        self.assertFalse(type_mod.native("u4"))
+        self.assertTrue(type_mod.signed_int("s4"))
+        self.assertTrue(type_mod.unsigned_int("u4"))
+        self.assertFalse(type_mod.signed_int("f32"),
+                         "f32 has a sign bit but is not a signed integer")
+
+
+def _elixir_types() -> list[str] | None:
+    """Type names as Elixir sees them, for the cross-implementation parity check."""
+    mix = shutil.which("mix")
+    elixir_dir = REPO / "elixir"
+    if mix is None or not elixir_dir.is_dir():
+        return None
+    script = 'IO.puts(Enum.join(Gpark.Type.all(), ","))'
+    try:
+        done = subprocess.run(
+            [mix, "run", "--no-start", "-e", script],
+            cwd=elixir_dir, capture_output=True, text=True, timeout=300,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+    if done.returncode != 0:
+        return None
+    return sorted(f for f in done.stdout.strip().split(",") if f)
 
 
 def _elixir_digest() -> str | None:

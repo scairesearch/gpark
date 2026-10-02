@@ -113,9 +113,14 @@ def _note_exit(term: dict, ctx: Context) -> None:
     # and PTX is perfectly happy with that, so counting returns would fire on
     # correct code. Multiple `exit`s really do mean divergent threads are being
     # torn down twice.
-    ctx.exits += 1
+    #
+    # The first `exit` is how a kernel legitimately returns, though, so only the
+    # second and later ones are redundant. Counting the terminator unconditionally
+    # and then reporting every exit flags every kernel that has one at all.
     if term["base"] == "exit":
-        ctx.issue("multiple_exits", "kernel contains more than one exit")
+        ctx.exits += 1
+        if ctx.exits > 1:
+            ctx.issue("multiple_exits", "kernel contains more than one exit")
 
 
 def _check_instruction(i: dict, block: dict, index: int, ctx: Context) -> None:
