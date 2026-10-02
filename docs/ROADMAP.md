@@ -36,7 +36,11 @@ stream, so the graph it produces is linear unless the stream already implied the
 dependencies, while `cuGraphAddKernelNode` lets each node name its own predecessors
 and can express a DAG. Real multi-kernel pipelines are DAGs.
 
-`--external <path>` times another graph implementation from inside this harness.
+`--external <path>` prints an invocation for another graph implementation's
+benchmark. It does not run it, and no reported number includes it: a real comparison
+needs the external benchmark invoked in-process so both sides share one device and one
+thermal state, which requires knowing its output format. Treat the flag as a
+reminder, not a measurement.
 The reason is that graph-overhead claims are usually not comparable — clocks, driver
 state and thermals move between runs — so measuring both sides in one process is the
 only way the numbers mean anything.
@@ -89,6 +93,12 @@ memory, not a desire to have it.
       floats. Supporting them creates two unpack paths for `u4` depending on the
       operation, which is a worse outcome than one clear bit-twiddling path until
       there is a reason.
+- [ ] `Gpark.Quant` — the quantisation conversions as a module rather than as
+      hand-unrolled kernel bodies. `unpack_u4_f32` covers `u4`→`f32`; `e4m3`→`f32` is
+      the next one and is a better test of the type system, because e4m3 has subnormal
+      encoding and rounding rules that a shift-and-mask cannot express. Doing this as a
+      module before a second quant kernel exists would be a premature abstraction; doing
+      it after would leave two copies of the unpack path.
 
 ## Later: the user-facing surface
 
@@ -102,6 +112,9 @@ Sequenced so each layer is provable before the one above it exists.
 - [ ] `Gpark.Graph` — capture, instantiate, update. The measured win is already
       quantified by `graph_bench.cu`; this is just the API around it.
 - [ ] `Gpark.Autotune` — needs a target architecture and a real problem to tune.
+      A measured `block_dim` rather than a default: Taichi's default of 16 is
+      indefensible for a bandwidth-bound kernel, where occupancy and access width pull
+      in opposite directions and only a measurement settles it.
 
 ## Not planned
 

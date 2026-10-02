@@ -13,8 +13,8 @@
 //
 //   * it always launches at least 32 times, because a single launch measures
 //     launch overhead and nothing else;
-//   * it reports per-launch microseconds, not total time, so the number means the
-//     same thing regardless of how many launches were batched;
+//   * every column is normalised to *microseconds per kernel launch*, so the three
+//     paths mean the same thing -- see the note on units in measure() below;
 //   * it JITs the gpark goldens through the driver API, so what is being replayed
 //     is exactly the PTX gpark emits.
 //
@@ -26,6 +26,10 @@
 // Run:
 //   ./graph_bench                 # all kernels, both paths
 //   ./graph_bench --launches 256  # batch size for the graph path
+//
+// Unverified against a real toolkit. This file has only been syntax-checked against
+// stubs on a machine with no CUDA, so treat the first compile on real hardware as the
+// actual test of the driver-API names used here.
 
 #include <cuda.h>
 #include <cuda_runtime.h>
@@ -51,6 +55,17 @@ namespace {
   } while (0)
 
 constexpr const char* kCorpus = "../corpus/golden";
+
+// The driver API returns CUresult directly and has no sticky error to clear -- there
+// is no cuGetLastError, which is a runtime-API habit and does not exist here. Each
+// failure therefore prints the name of the result it was actually handed.
+bool driver_failed(const char* what, CUresult st) {
+  const char* name = nullptr;
+  cuGetErrorName(st, &name);
+  std::printf("  (%s failed: %s (%d); skipped)\n", what, name ? name : "?",
+              static_cast<int>(st));
+  return false;
+}
 
 double bytes_per_element(const std::string& name) {
   if (name == "vec_add_f32") return 12.0;
@@ -96,8 +111,24 @@ struct Result {
 
 // The measurement, for one kernel.
 //
+// ## Units
+//
+// Every path reports **microseconds per kernel launch**. That normalisation is the
+// thing that makes the speedup column mean anything, and it is easy to get wrong
+// because the three paths do different amounts of work per timed iteration:
+//
+//   plain    `launches` individual cuLaunchKernel calls          -> L kernels
+//   capture  one graph of L nodes, replayed `launches` times    -> L*L kernels
+//   driver   one graph of L nodes, replayed `launches` times    -> L*L kernels
+//
+// Dividing a graph path by `launches` alone reports the cost of a whole batched
+// replay and then compares it against a single launch, so the speedup column reads
+// roughly 1/L no matter how fast graphs actually are. With --launches 64 that is a
+// fabricated "0.06x" on a path that may well be winning. The divisor is therefore
+// L*L for both graph paths.
+//
 // `plain` is a stream loop: one cuLaunchKernel per iteration, synchronised only
-// once at the end. That is the fairest possible baseline — removing the sync would
+// once at the end. That is the fairest possible baseline -- removing the sync would
 // be measuring async queuing rather than launch cost, and would flatter graphs.
 //
 // `args` is deliberately a non-const reference: cuLaunchKernel takes `void**`, and
@@ -105,6 +136,9 @@ struct Result {
 Result measure(CUfunction fn, std::vector<void*>& args, size_t elements,
                int launches) {
   Result r;
+
+  const double l = static_cast<double>(launches);
+  const double graph_kernels = l * l;  // L nodes per replay, L replays
 
   // Warm up, discarding: JIT and first-launch costs would otherwise dominate.
   for (int i = 0; i < 4; ++i) {
@@ -128,7 +162,7 @@ Result measure(CUfunction fn, std::vector<void*>& args, size_t elements,
   cudaEventSynchronize(stop);
   float ms = 0.0f;
   cudaEventElapsedTime(&ms, start, stop);
-  r.plain_us = (ms * 1000.0) / launches;
+  r.plain_us = (ms * 1000.0) / l;
 
   // --- the same launches, captured once into a graph and replayed ---
   //
@@ -182,7 +216,8 @@ Result measure(CUfunction fn, std::vector<void*>& args, size_t elements,
   cudaEventRecord(stop);
   cudaEventSynchronize(stop);
   cudaEventElapsedTime(&ms, start, stop);
-  r.capture_us = (ms * 1000.0) / launches;
+  // Per kernel, not per replay: see the units note on measure().
+  r.capture_us = (ms * 1000.0) / graph_kernels;
 
   cudaGraphExecDestroy(exec);
   cudaGraphDestroy(graph);
@@ -200,20 +235,31 @@ Result measure(CUfunction fn, std::vector<void*>& args, size_t elements,
 // so this can express a DAG -- two independent dequantise kernels followed by a
 // dependent epilogue, say. That is the shape real pipelines have, and it is why both
 // paths are measured: a capture-based implementation cannot express it at all.
-Result measure_driver_graph(CUfunction fn, std::vector<void*>& args, size_t elements,
-                             int launches, double& out_us) {
-  Result r;
-
+//
+// The nodes here are chained (each depends on the previous one), so the graph built
+// is a chain rather than a DAG. That is enough to exercise the explicit-node API; a
+// genuinely wide graph would need the dependency list passed per node instead of a
+// single `prev`.
+//
+// Returns microseconds per kernel launch, or 0.0 if the driver graph path was
+// unavailable. Returning 0 rather than a Result keeps a failure in one path from
+// having to be unpacked against the other.
+double measure_driver_graph(CUfunction fn, std::vector<void*>& args, size_t elements,
+                            int launches) {
   CUgraph graph = nullptr;
-  if (cuGraphCreate(&graph, 0) != CUDA_SUCCESS) {
-    cuGetLastError();
-    std::printf("  (cuGraph unavailable; skipped)\n");
-    return r;
-  }
+  CUresult st = cuGraphCreate(&graph, 0);
+  if (st != CUDA_SUCCESS) return driver_failed("cuGraphCreate", st);
 
   CUgraphNode prev = nullptr;
   for (int i = 0; i < launches; ++i) {
-    CUkernelNodeParams params{};
+    // The v1 struct, which takes a CUfunction in `func`. CUDA 12 added
+    // CUDA_KERNEL_NODE_PARAMS_v2, whose first field is a CUkernel rather than a
+    // CUfunction -- those handles come from the cuLibrary* entry points, not from
+    // cuModuleGetFunction, so v1 is the correct pairing for the module-loading API
+    // this file uses. (The name here was previously CUDA_KERNEL_NODE_PARAMS_v2's
+    // cousin CUkernelNodeParams, which does not exist in the driver API at all and
+    // cannot have compiled against a real SDK.)
+    CUDA_KERNEL_NODE_PARAMS params{};
     params.func = fn;
     params.gridDimX = static_cast<unsigned>(elements);
     params.gridDimY = 1;
@@ -230,21 +276,21 @@ Result measure_driver_graph(CUfunction fn, std::vector<void*>& args, size_t elem
     const CUgraphNode* deps = prev ? &prev : nullptr;
     const size_t num_deps = prev ? 1 : 0;
 
-    if (cuGraphAddKernelNode(&node, graph, deps, num_deps, &params) != CUDA_SUCCESS) {
-      cuGetLastError();
+    st = cuGraphAddKernelNode(&node, graph, deps, num_deps, &params);
+    if (st != CUDA_SUCCESS) {
       cuGraphDestroy(graph);
-      std::printf("  (cuGraphAddKernelNode failed; skipped)\n");
-      return r;
+      driver_failed("cuGraphAddKernelNode", st);
+      return 0.0;
     }
     prev = node;
   }
 
   CUgraphExec exec = nullptr;
-  if (cuGraphInstantiateWithFlags(&exec, graph, 0) != CUDA_SUCCESS) {
-    cuGetLastError();
+  st = cuGraphInstantiateWithFlags(&exec, graph, 0);
+  if (st != CUDA_SUCCESS) {
     cuGraphDestroy(graph);
-    std::printf("  (cuGraphInstantiate failed; skipped)\n");
-    return r;
+    driver_failed("cuGraphInstantiateWithFlags", st);
+    return 0.0;
   }
 
   // Warm up, so instantiation is not charged to the replay timing.
@@ -262,13 +308,16 @@ Result measure_driver_graph(CUfunction fn, std::vector<void*>& args, size_t elem
   cudaEventSynchronize(stop);
   float ms = 0.0f;
   cudaEventElapsedTime(&ms, start, stop);
-  out_us = (ms * 1000.0) / launches;
+  // Per kernel: L nodes per replay times L replays. Same normalisation as capture,
+  // otherwise the two graph columns are not comparable with each other either.
+  const double graph_kernels = static_cast<double>(launches) * static_cast<double>(launches);
+  const double per_kernel_us = (ms * 1000.0) / graph_kernels;
   cudaEventDestroy(start);
   cudaEventDestroy(stop);
 
   cuGraphExecDestroy(exec);
   cuGraphDestroy(graph);
-  return r;
+  return per_kernel_us;
 }
 
 }  // namespace
@@ -282,11 +331,11 @@ int main(int argc, char** argv) {
     if (a == "--launches" && i + 1 < argc) {
       launches = std::atoi(argv[++i]);
     } else if (a == "--external" && i + 1 < argc) {
-      // Path to another graph implementation's benchmark, so a third-party system
-      // can be timed on exactly the same work by this harness rather than by a
-      // benchmark written for it. Comparability is the whole difficulty with
-      // graph-overhead claims, and the way to get it is to measure both sides in
-      // one process on one device.
+      // Path to another graph implementation's benchmark. This harness records it and
+      // prints an invocation; it does not execute it, and the numbers above are
+      // gpark's own. The honest version -- running the external benchmark in-process
+      // so both sides are timed on one device -- needs that benchmark's output format,
+      // which is not known here. See the note at the bottom of this file.
       external = argv[++i];
     } else {
       names.push_back(a);
@@ -315,10 +364,11 @@ int main(int argc, char** argv) {
 
   std::printf("device: %s (sm_%d%d)\n", devname, major, minor);
   std::printf("launches per measurement: %d\n", launches);
+  std::printf("all us columns are per kernel launch\n");
   std::printf("\n");
   std::printf("%-16s %11s %11s %11s %10s %9s\n", "kernel", "plain us",
               "capture us", "cuGraph us", "speedup", "GB/s");
-
+  std::printf("\n");
   for (const std::string& name : names) {
     const std::string text = read_text(std::string(kCorpus) + "/" + name + ".ptx");
 
@@ -360,11 +410,12 @@ int main(int argc, char** argv) {
     Result r = measure(fn, args, n, launches);
     // The driver-API path is measured separately so a failure in one does not
     // discard the other: these are different mechanisms with different version
-    // requirements.
-    measure_driver_graph(fn, args, n, launches, r.driver_us);
+    // requirements. It returns 0.0 when unavailable, which prints as "-".
+    r.driver_us = measure_driver_graph(fn, args, n, launches);
 
-    r.best_us = r.capture_us > 0.0 ? r.capture_us : r.driver_us;
-    if (r.driver_us > 0.0 && (r.best_us == 0.0 || r.driver_us < r.best_us)) {
+    if (r.capture_us > 0.0 && (r.driver_us <= 0.0 || r.capture_us < r.driver_us)) {
+      r.best_us = r.capture_us;
+    } else if (r.driver_us > 0.0) {
       r.best_us = r.driver_us;
     }
     const double gb_s =
@@ -396,15 +447,16 @@ int main(int argc, char** argv) {
 
   std::printf("\n");
   std::printf("Notes:\n");
+  std::printf("  All us columns are per kernel launch, which is what makes the\n");
+  std::printf("  speedup comparable. The graph columns build a graph of %d nodes\n", launches);
+  std::printf("  and replay it %d times, so each measures %d kernels.\n", launches,
+              launches * launches);
   std::printf("  speedup is plain/capture or plain/cuGraph, whichever is faster.\n");
   std::printf("  A win here only exists for small kernels; on large ones there is\n");
   std::printf("  nothing left to amortise and all three columns converge.\n");
   std::printf("  GB/s is achieved bandwidth for the plain-launch path only.\n");
   std::printf("  The graph number replays an already-instantiated graph, so it is the\n");
   std::printf("  floor a launch path has to beat, not a claim about Gpark.Graph.\n");
-  std::printf("  Per-launch microseconds is the comparable figure; a graph win shows\n");
-  std::printf("  up on small kernels and vanishes on large ones, because there is\n");
-  std::printf("  nothing left to amortise. That is the point of measuring both.\n");
   std::printf("\n");
   std::printf("  This does NOT compare against MAGMA. That comparison needs a target\n");
   std::printf("  problem and a baseline written against the same work, and gpark has\n");
@@ -412,11 +464,19 @@ int main(int argc, char** argv) {
 
   if (!external.empty()) {
     std::printf("\n");
-    std::printf("  External graph implementation supplied: %s\n", external.c_str());
-    std::printf("  Run it here so both are measured on one device in one process:\n");
+    std::printf("  External graph implementation: %s\n", external.c_str());
+    std::printf("\n");
+    std::printf("  This harness does NOT run it, and no number above includes it.\n");
+    std::printf("  It prints the invocation so both sides can be run against the same\n");
+    std::printf("  device back to back:\n");
     std::printf("    %s --launches %d\n", external.c_str(), launches);
-    std::printf("  Timing it separately and comparing numbers across runs is not\n");
-    std::printf("  comparable: clocks, driver state and thermals all move.\n");
+    std::printf("\n");
+    std::printf("  Comparing numbers across two separate runs is not sound: clocks,\n");
+    std::printf("  driver state and thermals all move between them. A real comparison\n");
+    std::printf("  needs the external benchmark to be invoked from here so both are\n");
+    std::printf("  measured in one process on one device, which means teaching this\n");
+    std::printf("  harness its output format. Until that exists, treat --external as\n");
+    std::printf("  a reminder, not as a measurement.\n");
   }
 
   cuCtxDestroy(ctx);

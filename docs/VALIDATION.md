@@ -121,10 +121,11 @@ question has a clean answer.
 
 `remote/graph_bench.cu` measures launch overhead three ways on one device in one
 process — plain launches, runtime-API stream capture, and a hand-built `cuGraph` —
-plus an `--external` hook to time a third-party graph implementation from inside the
-same harness. Read the notes at the bottom of that file before quoting it: it
-establishes the floor a graph implementation must beat, and it is not a MAGMA
-comparison.
+plus an `--external` hook that prints an invocation for a third-party graph
+benchmark. The hook does not execute it, so it contributes no number. Read the notes
+at the bottom of that file before quoting anything: every `us` column is normalised
+per kernel launch, which is what makes the three paths comparable, and it establishes
+the floor a graph implementation must beat rather than being a MAGMA comparison.
 
 ## Known limits
 
@@ -133,6 +134,16 @@ none.
 
 - **No GPU has ever run this.** Tiers two and three are written but unexecuted.
   Treat "validated" in any commit message as "static checks pass".
+- **The CUDA harnesses have never been compiled against a real toolkit.** They are
+  syntax-checked with `clang++ -fsyntax-only` against hand-written stub headers that
+  follow the documented API names. That catches typos and shape errors — it found
+  `cuGetLastError()`, which does not exist in the driver API, and
+  `CUkernelNodeParams`, which is not a driver type — but a stub encodes only what its
+  author already believed, so it cannot confirm a version-specific detail. The first
+  compile on real hardware is the real test. The driver `cuGraph` path in particular
+  uses the v1 `CUDA_KERNEL_NODE_PARAMS`, whose `func` field is a `CUfunction`; CUDA
+  12's `_v2` wants a `CUkernel` from the `cuLibrary*` entry points instead, which is
+  a different loading path than the module API these harnesses use.
 - **The initialisation check is linear, not a fixpoint.** It tracks a single
   register state and does not merge across branches, so a register written on one
   path and read on another can be reported wrongly in either direction. A real
