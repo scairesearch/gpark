@@ -1,0 +1,180 @@
+{
+  "$schema": "./rvgpu-table.schema.json",
+  "isa": "RVGPU",
+  "version": "1.0-draft",
+  "status": "UNFROZEN",
+  "$comment": [
+    "Single source of truth for the RVGPU instruction set. Both the Elixir and the",
+    "Python implementations LOAD this file at runtime; neither re-declares the data.",
+    "Emission and validation logic is implemented independently in each language so",
+    "the two can be cross-checked byte-for-byte (validation layer L0).",
+    "",
+    "status UNFROZEN is deliberate. Per the riscgp plan, the ISA must not be frozen",
+    "until the P0 decision study reports and the P1 gate picks Path A or Path B.",
+    "Both datapath paths are encoded here, tagged by `path`, so that switching is a",
+    "selection and not a rewrite.",
+    "",
+    "FIELDS",
+    "  domain     which execution unit runs this: core | mop | dma | vec | sync",
+    "  path       A = RVV datapath (vector cores do the math)",
+    "             B = Tenstorrent-style (RV cores issue, custom coprocessor computes)",
+    "             AB = common to both paths",
+    "  parts      dotted components the emitter renders, in order",
+    "  dtypes     accepted data/result types; [] means not applicable",
+    "  ndest      destination count (0 for stores, branches, sync)",
+    "  nops       operand count",
+    "  latency    cycles from issue to result readable (result visible to the ISSUER)",
+    "  throughput cycles between back-to-back issues to the same unit",
+    "  unit       the physical execution unit; drives cycle-model resource conflicts",
+    "  sync       true if the instruction participates in warp/tile-synchronous execution",
+    "  fence      true if the instruction orders prior memory ops (must not move across)"
+  ],
+
+  "registers": {
+    "core": {
+      "$comment": "RV32I GPRs. x0 reads as zero and is never written.",
+      "count": 32,
+      "abi": ["zero", "ra", "sp", "gp", "tp", "t0", "t1", "t2", "s0", "s1", "a0", "a1", "a2", "a3", "a4", "a5", "a6", "a7", "s2", "s3", "s4", "s5", "s6", "s7", "s8", "s9", "s10", "s11", "t3", "t4", "t5", "t6"]
+    },
+    "dst": {
+      "$comment": "Matrix-unit accumulators. Double-counted in the timing model: the single Matrix Unit serialises across all threads and all Dst banks.",
+      "count": 4,
+      "abi": ["dst0", "dst1", "dst2", "dst3"]
+    },
+    "lreg": {
+      "$comment": "Left matrix operand staging for the Matrix Unit.",
+      "count": 4,
+      "abi": ["lreg0", "lreg1", "lreg2", "lreg3"]
+    },
+    "srca": {
+      "$comment": "Right operand A. Two copies, double buffered; the unpacker writes one while the Matrix Unit reads the other.",
+      "count": 2,
+      "abi": ["srca0", "srca1"]
+    },
+    "srcb": {
+      "$comment": "Right operand B. Two copies, double buffered, same rule as srca.",
+      "count": 2,
+      "abi": ["srcb0", "srcb1"]
+    },
+    "vec": {
+      "$comment": "RVV vector registers. Path A only.",
+      "count": 32,
+      "abi_prefix": "v"
+    },
+    "sem": {
+      "$comment": "Tile semaphores, used for producer/consumer handshakes between the three compute threads.",
+      "count": 16,
+      "abi_prefix": "sem"
+    },
+    "cb": {
+      "$comment": "Circular-buffer descriptors, programmed by the data-movement engine.",
+      "count": 8,
+      "abi_prefix": "cb"
+    }
+  },
+
+  "address_spaces": ["sram", "lram", "dram", "imm", "nop"],
+
+  "opcodes": [
+    {"name": "nop",    "domain": "core", "path": "AB", "parts": ["name"], "dtypes": [], "ndest": 0, "nops": 0, "latency": 1, "throughput": 1, "unit": "core", "sync": false, "fence": false},
+
+    {"name": "addi",   "domain": "core", "path": "AB", "parts": ["name", "dtype"], "dtypes": ["s32", "u32"], "ndest": 1, "nops": 2, "latency": 1, "throughput": 1, "unit": "core", "sync": false, "fence": false},
+    {"name": "add",    "domain": "core", "path": "AB", "parts": ["name", "dtype"], "dtypes": ["s32", "u32"], "ndest": 1, "nops": 2, "latency": 1, "throughput": 1, "unit": "core", "sync": false, "fence": false},
+    {"name": "sub",    "domain": "core", "path": "AB", "parts": ["name", "dtype"], "dtypes": ["s32", "u32"], "ndest": 1, "nops": 2, "latency": 1, "throughput": 1, "unit": "core", "sync": false, "fence": false},
+    {"name": "slli",   "domain": "core", "path": "AB", "parts": ["name", "dtype"], "dtypes": ["s32", "u32"], "ndest": 1, "nops": 2, "latency": 1, "throughput": 1, "unit": "core", "sync": false, "fence": false},
+    {"name": "srli",   "domain": "core", "path": "AB", "parts": ["name", "dtype"], "dtypes": ["s32", "u32"], "ndest": 1, "nops": 2, "latency": 1, "throughput": 1, "unit": "core", "sync": false, "fence": false},
+    {"name": "srai",   "domain": "core", "path": "AB", "parts": ["name", "dtype"], "dtypes": ["s32", "u32"], "ndest": 1, "nops": 2, "latency": 1, "throughput": 1, "unit": "core", "sync": false, "fence": false},
+    {"name": "andi",   "domain": "core", "path": "AB", "parts": ["name", "dtype"], "dtypes": ["s32", "u32"], "ndest": 1, "nops": 2, "latency": 1, "throughput": 1, "unit": "core", "sync": false, "fence": false},
+    {"name": "xori",   "domain": "core", "path": "AB", "parts": ["name", "dtype"], "dtypes": ["s32", "u32"], "ndest": 1, "nops": 2, "latency": 1, "throughput": 1, "unit": "core", "sync": false, "fence": false},
+    {"name": "ori",    "domain": "core", "path": "AB", "parts": ["name", "dtype"], "dtypes": ["s32", "u32"], "ndest": 1, "nops": 2, "latency": 1, "throughput": 1, "unit": "core", "sync": false, "fence": false},
+
+    {"name": "mul",    "domain": "core", "path": "AB", "parts": ["name", "dtype"], "dtypes": ["s32", "u32"], "ndest": 1, "nops": 2, "latency": 3, "throughput": 1, "unit": "core", "sync": false, "fence": false},
+    {"name": "mulh",   "domain": "core", "path": "AB", "parts": ["name", "dtype"], "dtypes": ["s32"], "ndest": 1, "nops": 2, "latency": 3, "throughput": 1, "unit": "core", "sync": false, "fence": false},
+    {"name": "div",    "domain": "core", "path": "AB", "parts": ["name", "dtype"], "dtypes": ["s32", "u32"], "ndest": 1, "nops": 2, "latency": 34, "throughput": 1, "unit": "core", "sync": false, "fence": false},
+    {"name": "rem",    "domain": "core", "path": "AB", "parts": ["name", "dtype"], "dtypes": ["s32", "u32"], "ndest": 1, "nops": 2, "latency": 34, "throughput": 1, "unit": "core", "sync": false, "fence": false},
+
+    {"name": "slt",    "domain": "core", "path": "AB", "parts": ["name", "dtype"], "dtypes": ["s32", "u32"], "ndest": 1, "nops": 2, "latency": 1, "throughput": 1, "unit": "core", "sync": false, "fence": false},
+    {"name": "slti",   "domain": "core", "path": "AB", "parts": ["name", "dtype"], "dtypes": ["s32", "u32"], "ndest": 1, "nops": 2, "latency": 1, "throughput": 1, "unit": "core", "sync": false, "fence": false},
+    {"name": "sltu",   "domain": "core", "path": "AB", "parts": ["name", "dtype"], "dtypes": ["s32", "u32"], "ndest": 1, "nops": 2, "latency": 1, "throughput": 1, "unit": "core", "sync": false, "fence": false},
+
+    {"name": "lw",     "domain": "core", "path": "AB", "parts": ["name", "space", "dtype"], "dtypes": ["s32", "u32", "f32"], "ndest": 1, "nops": 1, "latency": 8, "throughput": 7, "unit": "core", "sync": false, "fence": false,
+     "spaces": ["sram", "lram", "dram"]},
+    {"name": "sw",     "domain": "core", "path": "AB", "parts": ["name", "space", "dtype"], "dtypes": [], "ndest": 0, "nops": 2, "latency": 5, "throughput": 5, "unit": "core", "sync": false, "fence": false,
+     "spaces": ["sram", "lram", "dram"]},
+    {"name": "lb",     "domain": "core", "path": "AB", "parts": ["name", "space", "dtype"], "dtypes": ["s8", "u8"], "ndest": 1, "nops": 1, "latency": 8, "throughput": 7, "unit": "core", "sync": false, "fence": false,
+     "spaces": ["sram", "lram", "dram"]},
+    {"name": "sb",     "domain": "core", "path": "AB", "parts": ["name", "space", "dtype"], "dtypes": [], "ndest": 0, "nops": 2, "latency": 5, "throughput": 5, "unit": "core", "sync": false, "fence": false,
+     "spaces": ["sram", "lram", "dram"]},
+    {"name": "lbu",    "domain": "core", "path": "AB", "parts": ["name", "space", "dtype"], "dtypes": ["u8"], "ndest": 1, "nops": 1, "latency": 8, "throughput": 7, "unit": "core", "sync": false, "fence": false,
+     "spaces": ["sram", "lram", "dram"]},
+
+    {"name": "beq",    "domain": "core", "path": "AB", "parts": ["name"], "dtypes": [], "ndest": 0, "nops": 3, "latency": 1, "throughput": 1, "unit": "core", "sync": false, "fence": false},
+    {"name": "bne",    "domain": "core", "path": "AB", "parts": ["name"], "dtypes": [], "ndest": 0, "nops": 3, "latency": 1, "throughput": 1, "unit": "core", "sync": false, "fence": false},
+    {"name": "blt",    "domain": "core", "path": "AB", "parts": ["name"], "dtypes": [], "ndest": 0, "nops": 3, "latency": 1, "throughput": 1, "unit": "core", "sync": false, "fence": false},
+    {"name": "bge",    "domain": "core", "path": "AB", "parts": ["name"], "dtypes": [], "ndest": 0, "nops": 3, "latency": 1, "throughput": 1, "unit": "core", "sync": false, "fence": false},
+    {"name": "bltu",   "domain": "core", "path": "AB", "parts": ["name"], "dtypes": [], "ndest": 0, "nops": 3, "latency": 1, "throughput": 1, "unit": "core", "sync": false, "fence": false},
+    {"name": "bgeu",   "domain": "core", "path": "AB", "parts": ["name"], "dtypes": [], "ndest": 0, "nops": 3, "latency": 1, "throughput": 1, "unit": "core", "sync": false, "fence": false},
+    {"name": "jal",    "domain": "core", "path": "AB", "parts": ["name"], "dtypes": [], "ndest": 1, "nops": 1, "latency": 1, "throughput": 1, "unit": "core", "sync": false, "fence": false},
+    {"name": "jalr",   "domain": "core", "path": "AB", "parts": ["name"], "dtypes": [], "ndest": 1, "nops": 1, "latency": 1, "throughput": 1, "unit": "core", "sync": false, "fence": false},
+
+    {"name": "dm.push", "domain": "dma", "path": "B", "parts": ["name", "modifier"], "dtypes": [], "ndest": 0, "nops": 2, "latency": 2, "throughput": 1, "unit": "core", "sync": false, "fence": false,
+     "modifiers": [null, "insn"],
+     "$comment": "Push a raw coprocessor instruction word to the named compute thread. `dm.push` carries the word in a register; `dm.push.insn` carries an immediate, which is how Tenstorrent's .ttinsn encodes a static push in a single 32-bit instruction."},
+
+    {"name": "dma.issue", "domain": "dma", "path": "AB", "parts": ["name"], "dtypes": [], "ndest": 0, "nops": 3, "latency": 1, "throughput": 1, "unit": "dma", "sync": false, "fence": true,
+     "$comment": "Issue a descriptor from SRAM. Operands: {space, base, count}. Ordered against prior core memory ops by fence=true."},
+    {"name": "dma.cb.cfg", "domain": "dma", "path": "B", "parts": ["name"], "dtypes": [], "ndest": 0, "nops": 3, "latency": 1, "throughput": 1, "unit": "dma", "sync": false, "fence": false,
+     "$comment": "Program circular-buffer descriptor. Operands: {cb, space, base}."},
+    {"name": "dma.cb.reserve", "domain": "dma", "path": "B", "parts": ["name"], "dtypes": [], "ndest": 1, "nops": 1, "latency": 1, "throughput": 1, "unit": "dma", "sync": true, "fence": false,
+     "$comment": "Claim the next free slot in a circular buffer. Blocks when full. This is the producer side of the three-thread software pattern."},
+    {"name": "dma.cb.commit", "domain": "dma", "path": "B", "parts": ["name"], "dtypes": [], "ndest": 0, "nops": 2, "latency": 1, "throughput": 1, "unit": "dma", "sync": true, "fence": false,
+     "$comment": "Publish a reserved slot and release the slot it replaced. Consumer side."},
+    {"name": "dma.mcast", "domain": "dma", "path": "AB", "parts": ["name"], "dtypes": [], "ndest": 0, "nops": 3, "latency": 1, "throughput": 1, "unit": "dma", "sync": false, "fence": true,
+     "$comment": "Multicast a tile's SRAM to a rectangle of peer tiles. Reduces total DRAM traffic when several tiles read the same K/V. Operands: {space, base, mask}."},
+    {"name": "dma.fence", "domain": "dma", "path": "AB", "parts": ["name"], "dtypes": [], "ndest": 0, "nops": 0, "latency": 1, "throughput": 1, "unit": "dma", "sync": false, "fence": true,
+     "$comment": "Order the DMA engine against core memory ops. Does not wait for completion; use stallwait for that."},
+
+    {"name": "mop.mma", "domain": "mop", "path": "B", "parts": ["name", "modifier", "dtype"], "dtypes": ["f16", "bf16", "f32", "s8", "s16", "s32"], "ndest": 1, "nops": 3, "latency": 16, "throughput": 32, "unit": "matrix", "sync": false, "fence": false,
+     "modifiers": [null, "acc"],
+     "$comment": "The core of Path B. Dst[d] = (LReg[l] * SrcA[a] + SrcB[b]) with optional accumulate. One Matrix Unit serves all three threads and all Dst banks, so throughput here is the scarce resource the whole three-thread pattern is built around."},
+    {"name": "mop.elt", "domain": "mop", "path": "B", "parts": ["name", "modifier", "dtype"], "dtypes": ["f16", "bf16", "f32", "s8", "s16", "s32"], "ndest": 1, "nops": 2, "latency": 8, "throughput": 8, "unit": "matrix", "sync": false, "fence": false,
+     "modifiers": ["add", "mul", "sub", "max", "min", "relu", "exp", "rsqrt"],
+     "$comment": "Elementwise on Dst. The Vector Unit (SFPU) is a separate physical unit, so these do not contend with mma on the matrix pipeline."},
+    {"name": "mop.set", "domain": "mop", "path": "B", "parts": ["name", "modifier", "dtype"], "dtypes": ["f16", "bf16", "f32", "s8", "s16", "s32", "s32"], "ndest": 0, "nops": 3, "latency": 4, "throughput": 2, "unit": "unpack", "sync": false, "fence": false,
+     "modifiers": ["lreg", "srca", "srcb"],
+     "$comment": "Load a matrix operand register from SRAM. Operands: {modifier, space, addr}."},
+    {"name": "mop.store", "domain": "mop", "path": "B", "parts": ["name", "space", "dtype"], "dtypes": ["f16", "bf16", "f32", "s8", "s16", "s32"], "ndest": 0, "nops": 2, "latency": 4, "throughput": 2, "unit": "pack", "sync": false, "fence": false,
+     "spaces": ["sram", "dram"],
+     "$comment": "Write Dst back to memory. Operands: {space, addr}."},
+    {"name": "mop.splat", "domain": "mop", "path": "B", "parts": ["name", "modifier", "dtype"], "dtypes": ["f16", "bf16", "f32", "s8", "s16", "s32"], "ndest": 1, "nops": 2, "latency": 2, "throughput": 2, "unit": "unpack", "sync": false, "fence": false,
+     "modifiers": ["lreg", "srca", "srcb"],
+     "$comment": "Broadcast a scalar into all lanes of a matrix operand register."},
+    {"name": "mop.reduce", "domain": "mop", "path": "B", "parts": ["name", "modifier", "dtype"], "dtypes": ["f16", "bf16", "f32", "s8", "s16", "s32"], "ndest": 1, "nops": 2, "latency": 24, "throughput": 24, "unit": "vector", "sync": false, "fence": false,
+     "modifiers": ["sum", "max", "min"],
+     "$comment": "Row or column reduction of Dst. Highest latency in the ISA; the compiler must not hide it behind a following mma."},
+
+    {"name": "vsetvli", "domain": "vec", "path": "A", "parts": ["name"], "dtypes": [], "ndest": 0, "nops": 2, "latency": 1, "throughput": 1, "unit": "vector", "sync": false, "fence": false,
+     "$comment": "RVV vtype/vl configuration. Path A only."},
+    {"name": "vle", "domain": "vec", "path": "A", "parts": ["name", "space", "dtype"], "dtypes": ["s8", "s16", "s32", "u8", "u16", "u32", "f16", "f32", "f64"], "ndest": 1, "nops": 1, "latency": 8, "throughput": 1, "unit": "vector", "sync": false, "fence": false,
+     "spaces": ["sram", "lram", "dram"]},
+    {"name": "vse", "domain": "vec", "path": "A", "parts": ["name", "space", "dtype"], "dtypes": ["s8", "s16", "s32", "u8", "u16", "u32", "f16", "f32", "f64"], "ndest": 0, "nops": 2, "latency": 5, "throughput": 1, "unit": "vector", "sync": false, "fence": false,
+     "spaces": ["sram", "lram", "dram"]},
+    {"name": "vfmacc", "domain": "vec", "path": "A", "parts": ["name", "modifier", "dtype"], "dtypes": ["f16", "bf16", "f32", "s8", "s16", "s32"], "ndest": 1, "nops": 3, "latency": 16, "throughput": 1, "unit": "matrix", "sync": false, "fence": false,
+     "modifiers": [null, "acc"],
+     "$comment": "Path A's counterpart to mop.mma. Same matrix unit, different issue mechanism."},
+    {"name": "vfredsum", "domain": "vec", "path": "A", "parts": ["name", "dtype"], "dtypes": ["f16", "f32"], "ndest": 1, "nops": 2, "latency": 24, "throughput": 1, "unit": "vector", "sync": false, "fence": false},
+    {"name": "vfmadd", "domain": "vec", "path": "A", "parts": ["name", "modifier", "dtype"], "dtypes": ["f16", "bf16", "f32"], "ndest": 1, "nops": 3, "latency": 4, "throughput": 1, "unit": "vector", "sync": false, "fence": false,
+     "modifiers": [null, "acc"]},
+
+    {"name": "sync.sem", "domain": "sync", "path": "AB", "parts": ["name", "modifier"], "dtypes": [], "ndest": 0, "nops": 2, "latency": 1, "throughput": 1, "unit": "sync", "sync": true, "fence": false,
+     "modifiers": ["acquire", "release", "wait"],
+     "$comment": "Semaphore operation. `wait` blocks until the semaphore is set. acquire/release are the fence-carrying half of producer/consumer; wait alone provides no memory ordering."},
+    {"name": "sync.tile", "domain": "sync", "path": "AB", "parts": ["name"], "dtypes": [], "ndest": 0, "nops": 0, "latency": 1, "throughput": 1, "unit": "sync", "sync": true, "fence": true,
+     "$comment": "Barrier across the three compute threads of one Tensix tile. This is the only full tile barrier; the tile is the atomic unit of scheduling."},
+    {"name": "sync.noc", "domain": "sync", "path": "AB", "parts": ["name"], "dtypes": [], "ndest": 0, "nops": 0, "latency": 1, "throughput": 1, "unit": "sync", "sync": true, "fence": true,
+     "$comment": "NoC barrier. Orders all outstanding multicast and DMA against the mesh."},
+    {"name": "stallwait", "domain": "sync", "path": "B", "parts": ["name", "modifier"], "dtypes": [], "ndest": 0, "nops": 2, "latency": 1, "throughput": 1, "unit": "sync", "sync": true, "fence": false,
+     "modifiers": ["unit", "dst", "dma"],
+     "$comment": "Block the issuing core until a named unit is idle. This is the instruction Tenstorrent's docs insist on: a pushed coprocessor instruction is not complete when the next core instruction retires, and reading its result too early is a silent-wrong-answer bug, not a crash."}
+  ]
+}
