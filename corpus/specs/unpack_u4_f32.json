@@ -147,6 +147,25 @@
           "vec": null
         },
         {
+          "base": "bra",
+          "dest": null,
+          "dtype": null,
+          "modifier": null,
+          "ops": [
+            [
+              "label",
+              "done"
+            ]
+          ],
+          "pred": [
+            "pred",
+            2
+          ],
+          "space": null,
+          "srctype": null,
+          "vec": null
+        },
+        {
           "base": "mul.wide",
           "dest": [
             "reg",
@@ -1375,20 +1394,12 @@
       ],
       "label": "entry",
       "term": {
-        "base": "bra",
+        "base": "ret",
         "dest": null,
         "dtype": null,
         "modifier": null,
-        "ops": [
-          [
-            "label",
-            "done"
-          ]
-        ],
-        "pred": [
-          "pred",
-          2
-        ],
+        "ops": [],
+        "pred": null,
         "space": null,
         "srctype": null,
         "vec": null

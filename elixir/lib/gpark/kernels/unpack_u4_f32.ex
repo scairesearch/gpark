@@ -75,10 +75,18 @@ defmodule Gpark.Kernels.UnpackU4F32 do
   end
 
   defp entry do
+    # The guarded branch is an *instruction*, not the block terminator, and it must
+    # come before any memory access. PTX has no "branch if false", so branch on the
+    # negated predicate; an untaken predicated branch falls through to the next
+    # instruction, which is the body. Using the block terminator for the branch
+    # instead would emit it *after* the body, so every out-of-range lane would run
+    # the work it was supposed to skip -- including a 32-byte out-of-bounds store.
+    guard = IR.instr("bra", ops: [IR.label(:done)], pred: IR.pred(@p_skip))
+
     IR.block(
       :entry,
-      bounds_check() ++ load_word() ++ words() ++ store_index(),
-      IR.instr("bra", ops: [IR.label(:done)], pred: IR.pred(@p_skip))
+      bounds_check() ++ [guard] ++ load_word() ++ words() ++ store_index(),
+      IR.instr("ret")
     )
   end
 
@@ -110,8 +118,9 @@ defmodule Gpark.Kernels.UnpackU4F32 do
         dest: IR.pred(@p_in),
         ops: [IR.reg(:u32, @r_gid), IR.reg(:u32, @r_n)]
       ),
-      # Exit out of range rather than branch around the body: one predicate, one
-      # branch, no second block to keep in sync.
+      # @p_in means "this thread is out of range" (gid >= n), which is the
+      # opposite of what the name suggests at the point of use, so invert it once
+      # here rather than at every branch.
       IR.instr("not", dtype: :pred, dest: IR.pred(@p_skip), ops: [IR.pred(@p_in)])
     ]
   end

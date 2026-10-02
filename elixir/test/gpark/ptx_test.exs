@@ -116,6 +116,72 @@ defmodule Gpark.PTXTest do
       assert names == goldens
     end
 
+    test "bounds guards precede every global access" do
+      # A kernel that guards a bounds check by branching *after* the guarded work is
+      # silently, catastrophically wrong: every out-of-range lane performs the loads
+      # and stores it was supposed to skip. `unpack_u4_f32` had exactly this bug --
+      # the branch was the block terminator, so it emitted after the body, and an
+      # out-of-range lane wrote 32 bytes past the end of the output buffer.
+      #
+      # Nothing about that is catchable from the bytes alone: the golden is
+      # self-consistent and the validator is happy, because both were handed a
+      # program that is valid PTX and merely not the program intended. So the
+      # property is asserted directly on the emitted text.
+      for name <- kernel_names() do
+        ptx = File.read!(Path.join(Gpark.Golden.dir(), "#{name}.ptx"))
+
+        # Match on the index list rather than `assert`ing it: `assert []` passes in
+        # Elixir, because only nil and false are falsy.
+        branch_at =
+          case Regex.run(~r/bra \$L__\w+;/, ptx, return: :index) do
+            [{at, _} | _] -> at
+            nil -> flunk("#{name}: no bounds guard branch in the emitted PTX")
+          end
+
+        # The property that matters for memory safety, and the one every bounds-checked
+        # kernel must satisfy: no global *store* may precede the guard. `unpack_u4_f32`
+        # had exactly this bug -- the branch was the block terminator, so it emitted
+        # after the body, and an out-of-range lane wrote 32 bytes past the output buffer.
+        store_at =
+          case Regex.run(~r/st\.global/, ptx, return: :index) do
+            [{at, _} | _] -> at
+            nil -> nil
+          end
+
+        if store_at do
+          assert store_at > branch_at,
+                 """
+                 #{name}: first global store at byte #{store_at} precedes the bounds \
+                 guard at byte #{branch_at}, so out-of-range lanes would write \
+                 out of bounds. Move the guarded branch into the instruction list, \
+                 before the body, and make the block terminator `ret`.
+                 """
+        end
+
+        # Stronger property, for kernels that guard *per element* and therefore must
+        # not even read out of range. `reduce_sum_f32` is deliberately excluded: it is
+        # a reduction, so it has to load every lane, and it relies on the caller
+        # passing a warp-multiple `n`. That contract is documented in the kernel and
+        # enforced by the harness padding, but it is a weaker guarantee than an
+        # in-kernel guard, and it is the reason this loop is not simply
+        # `for name <- kernel_names()`.
+        if name in ["vec_add_f32", "saxpy_f32", "unpack_u4_f32"] do
+          load_at =
+            case Regex.run(~r/ld\.global/, ptx, return: :index) do
+              [{at, _} | _] -> at
+              nil -> flunk("#{name}: expected a global load in the emitted PTX")
+            end
+
+          assert load_at > branch_at,
+                 """
+                 #{name}: first global load at byte #{load_at} precedes the bounds \
+                 guard at byte #{branch_at}, so out-of-range lanes would read \
+                 out of bounds.
+                 """
+        end
+      end
+    end
+
     test "covers the intended kernel families" do
       # Guards against a corpus that quietly stops testing anything.
       assert kernel_names() ==
