@@ -29,6 +29,10 @@ jobs:
       # two implementations cannot drift apart without a test failing. Cached before
       # the build, keyed on the lockfile: a stale dependency tree silently changing
       # the opcode digest would be baffling to debug.
+      #
+      # The cache is an optimisation, never the source of dependencies. A cache miss
+      # restores nothing and `mix deps.get` has to run regardless, or the first push
+      # to a fresh repo fails on `jason` not being available. Both jobs need it.
       - uses: actions/cache@v4
         with:
           path: |
@@ -38,6 +42,9 @@ jobs:
             elixir/deps
           key: ${{ runner.os }}-mix-${{ hashFiles('elixir/mix.lock') }}
           restore-keys: ${{ runner.os }}-mix-
+
+      - name: Fetch dependencies
+        run: cd elixir && mix deps.get
 
       - name: Run both suites
         run: make test

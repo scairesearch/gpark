@@ -27,6 +27,15 @@ build/
 .DS_Store
 corpus/golden/.ptxas/
 
+# A BEAM crash dump is raw process memory: megabytes of binary that mean nothing to
+# a reader and are re-downloaded by everyone who clones. It was committed once by
+# accident and rode along until the repo went public.
+erl_crash.dump
+
+# Local AI-tool state. Not project content, and it was the reason a plan for the
+# unrelated riscgp project sat in gpark's tree.
+.kilo/
+
 # Unrelated project sharing this working tree; kept out of gpark history.
 # Tracked files were removed from the index only -- see docs/DECISIONS.md.
 riscgp/
