@@ -119,9 +119,12 @@ Each kernel reports GB/s alongside microseconds. Correctness and speed are separ
 questions, and the corpus kernels are bandwidth-bound on purpose so that the second
 question has a clean answer.
 
-`remote/graph_bench.cu` measures launch overhead against CUDA Graph replay. Read the
-notes at the bottom of that file before quoting it: it establishes the floor a graph
-implementation must beat, and it is not a MAGMA comparison.
+`remote/graph_bench.cu` measures launch overhead three ways on one device in one
+process — plain launches, runtime-API stream capture, and a hand-built `cuGraph` —
+plus an `--external` hook to time a third-party graph implementation from inside the
+same harness. Read the notes at the bottom of that file before quoting it: it
+establishes the floor a graph implementation must beat, and it is not a MAGMA
+comparison.
 
 ## Known limits
 

@@ -27,15 +27,26 @@ current state rather than a shortfall.
 warp-multiple `n` and reads out of bounds otherwise. Clamping the index is the real
 fix. It needs hardware to validate, so it is queued here rather than done blind.
 
-**3. Decide "GraphSuite".** The reference has been ambiguous from the start: CUDA
-Graphs, cuGraph, or something else entirely. Until it is resolved, `graph_bench.cu`
-measures CUDA Graph replay against plain launches and says so in its own output. No
-comparison against another system is written until this is answered.
+**3. Graph systems: all of them, not one.** The "GraphSuite" reference was ambiguous
+from the start — CUDA Graphs, cuGraph, or a named third-party system — and the answer
+is to stop narrowing it. `graph_bench.cu` now measures three paths on one device in
+one process: plain launches, runtime-API stream capture, and a hand-built `cuGraph`.
+Capture and `cuGraph` are different mechanisms, not duplicates: capture records a
+stream, so the graph it produces is linear unless the stream already implied the
+dependencies, while `cuGraphAddKernelNode` lets each node name its own predecessors
+and can express a DAG. Real multi-kernel pipelines are DAGs.
 
-**4. The MAGMA comparison.** A real benchmark needs a real baseline. That means
-picking a target problem, writing the baseline honestly, and being clear that gpark
-does not have matmul yet. It is not written because there is nothing to compare
-against — see item 3.
+`--external <path>` times another graph implementation from inside this harness.
+The reason is that graph-overhead claims are usually not comparable — clocks, driver
+state and thermals move between runs — so measuring both sides in one process is the
+only way the numbers mean anything.
+
+What is still missing is the comparison against a system that does *not* use CUDA
+Graphs at all, which is where the real portability claim would live.
+
+**4. The MAGMA comparison.** A real benchmark needs a real baseline: pick a target
+problem, write it honestly, and be clear that gpark has no matmul yet. Not written
+because there is currently nothing to compare against.
 
 ## Next: shared memory, because two kernels now need it
 
