@@ -1,0 +1,62 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    name: Static validation (no GPU required)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: erlef/setup-beam@v1
+        with:
+          elixir-version: '1.17'
+          otp-version: '27'
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      # Tier one only. Tiers two and three need a GPU and are run manually via
+      # `make remote` and `make remote-build` on a CUDA host -- they cannot gate a
+      # commit on a hosted runner, and pretending otherwise would mean reporting a
+      # number no one measured.
+      # The Python suite invokes `mix run` to compare hashed opcode tables, so the
+      # two implementations cannot drift apart without a test failing. Cached before
+      # the build, keyed on the lockfile: a stale dependency tree silently changing
+      # the opcode digest would be baffling to debug.
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.hex
+            ~/.mix
+            elixir/_build
+            elixir/deps
+          key: ${{ runner.os }}-mix-${{ hashFiles('elixir/mix.lock') }}
+          restore-keys: ${{ runner.os }}-mix-
+
+      - name: Run both suites
+        run: make test
+
+  ptxas:
+    name: ptxas assembly gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: Jimver/cuda-toolkit@v0.2.16
+        with:
+          cuda: '12.1.0'
+          method: network
+          sub-packages: '["ptxas"]'
+
+      # ptxas does not need a GPU, so tier two belongs in CI even though the rest
+      # of the CUDA story does not. This is the gate that catches a hand-written
+      # register assignment that no longer fits -- the failure mode the whole
+      # no-allocator design makes possible.
+      - name: Assemble every golden, fail on spills
+        run: make remote GPARK_ARCH=sm_80
