@@ -26,3 +26,7 @@ build/
 .ruff_cache/
 .DS_Store
 corpus/golden/.ptxas/
+
+# Unrelated project sharing this working tree; kept out of gpark history.
+# Tracked files were removed from the index only -- see docs/DECISIONS.md.
+riscgp/

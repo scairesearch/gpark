@@ -111,5 +111,5 @@ capability is what would make it a fact. Not built yet — only CUDA exists.
 
 ## Licence
 
-AGPL-3.0. `LICENSE` currently carries the notice and a pointer; the canonical text
-must be added before any public release.
+AGPL-3.0. `LICENSE` carries the copyright notice followed by the verbatim licence
+text; [`docs/LICENSING.md`](docs/LICENSING.md) records its source and checksum.

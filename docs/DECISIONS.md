@@ -232,10 +232,12 @@ before being trusted. Verified by reverting the fix and watching the test fail.
 **Decided.** AGPL-3.0, and the network clause is intentional: this is meant to stay
 usable as a service.
 
-**Outstanding.** `LICENSE` contains the notice and a pointer, not the canonical text.
-That must be fixed before any public release. Flagged rather than done, because
-fetching and verifying the full text is a separate, checkable step and a
-half-attribution is worse than a clear gap.
+**Resolved.** `LICENSE` now carries the verbatim AGPL-3.0 text (SHA-256
+`0d96a4ff…`, retrieved from gnu.org and recorded in `LICENSING.md` with a command to
+re-verify). It was flagged rather than filled in while it was still a gap, because
+fetching the canonical text is a checkable step and a half-attribution is worse than
+an acknowledged absence. The licence body is unmodified; provenance lives in a
+separate file so the text stays byte-identical to the FSF's.
 
 ---
 
