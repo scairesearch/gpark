@@ -109,6 +109,28 @@ every golden's provenance.
 `srctype` is nullable and round-trips as `null`. Sub-byte kernels need no source
 type on their element loads, so requiring one would mean inventing a fake.
 
+### `Gpark.Backend` — the capability gate
+
+The contract a backend implements (`name`, `ops`, `types`, `emit`, `check`) plus
+`require!/2`, which refuses a kernel the backend cannot handle and names every missing
+opcode or type at once. `emit!/2` raises instead.
+
+This is where the neutral-IR claim stops being a claim. The IR always knew nothing
+about PTX, but nothing stopped a backend from emitting a slower sequence for something
+it did not support — the kernel would still be correct, still match its golden, and be
+three times slower, with no symptom other than the benchmark. `require!/2` turns that
+into a build-time error.
+
+`check/1` and `require!/2` answer different questions and are kept apart: `check/1`
+reports a malformed kernel, `require!/2` reports a valid kernel outside this backend's
+capabilities. A kernel can pass one and fail the other, and conflating them would hide
+the real error behind a capability message.
+
+`Gpark.PTX.ops/0` and `types/0` read from `Gpark.Ops` and `Gpark.Type` rather than
+keeping hand-written lists, so the gate cannot drift from what the emitter is willing
+to spell. Mirrored in `python/gpark/backend.py`, because a Python user should get the
+same refusal.
+
 ### `Gpark.Opt.Simplify` — fixpoint simplification
 
 Runs rules until nothing fires. v0.1 has two: unreachable blocks, and dead

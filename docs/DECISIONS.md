@@ -339,7 +339,7 @@ Recorded so the omissions read as decisions rather than as work not reached.
 | Taichi | gpark | Reason |
 | --- | --- | --- |
 | `full_simplify` | **Adopted** | Fixpoint over rules. See above. |
-| Neutral SIR / no language coupling | **Partly adopted** | gpark's IR is already neutral, but nothing enforces it. `Gpark.Backend` behaviour is the enforcement; not yet written. |
+| Neutral SIR / no language coupling | **Adopted** | `Gpark.Backend` is the contract and `require!/2` is the enforcement. The IR was already neutral in that nothing in it knew about PTX; what was missing was anything stopping a backend from emitting a slower sequence for a capability it lacked. A gate that accepts everything is no gate, so the tests refuse real kernels and check the refusal names the capability. |
 | `ti.kernel` / `ti.data` Pythonic surface | **Planned** | The DSL is the ergonomics answer. Not written. |
 | Reverse-mode autodiff | **Declined** | gpark has no runtime and no tape. Adding one means owning a graph format and a backward pass, which is a second project. The quant interest here is explicit quantisation, not learning. |
 | Runtime, `ti.init()`, memory pools | **Declined** | Launch overhead and allocation are exactly what gpark wants visible. A pool hides the allocation the benchmark is measuring. |

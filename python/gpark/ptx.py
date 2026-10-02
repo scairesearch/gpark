@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import struct
 
-from gpark import ir, ops
+from gpark import ir, ops as ops_mod, type as type_mod
 
 # PTX has no fixed register classes, but nvcc's ordering is a good convention:
 # predicates, then 32-bit, then 64-bit, then the float banks.
@@ -126,7 +126,7 @@ def _guard(pred) -> str:
 
 def opcode(i: dict) -> str:
     """Render an instruction's opcode string, dotted parts in PTX order."""
-    spec = ops.fetch(i["base"])
+    spec = ops_mod.fetch(i["base"])
     if spec is None:
         raise ValueError(f"unknown opcode {i['base']!r}")
 
@@ -244,3 +244,45 @@ def _compress(ids: list[int]) -> list[tuple[int, int]]:
     if current is not None:
         runs.append(current)
     return runs
+
+
+# --- Gpark.Backend capability gate -------------------------------------------
+#
+# The Elixir backend declares these as callbacks. Both languages expose the same
+# contract, so a Python user gets the same refusal rather than a silent fallback.
+
+
+def name() -> str:
+    """A short name for this backend, for diagnostics."""
+    return "ptx"
+
+
+def ops() -> list[str]:
+    """Every opcode base gpark can render.
+
+    Taken from the table rather than hand-kept, so it cannot drift from what
+    :func:`emit` is willing to spell.
+    """
+    return ops_mod.names()
+
+
+def types() -> list[str]:
+    """Every type gpark can represent.
+
+    Includes ``s2 u2 s4 u4``, which have no direct PTX spelling -- ``ptx_type`` returns
+    ``None`` for a bare ``:u4`` -- but are representable packed into a container or
+    widened before arithmetic.
+    """
+    return type_mod.all_types()
+
+
+def check(k: dict) -> tuple[dict | None, list]:
+    """Structural validation, delegated to :mod:`gpark.validate`.
+
+    Separate from the capability gate on purpose: this reports a malformed kernel,
+    where the gate reports a valid kernel this backend cannot handle. A kernel can
+    pass one and fail the other.
+    """
+    from gpark import validate
+
+    return validate.check(k)

@@ -146,5 +146,5 @@ because a kernel in `corpus/` needed it; every opcode a kernel needed is in the
 table. There is no speculative surface, and `ptx_test.exs` asserts which kernel
 families are covered so the corpus cannot silently shrink.
 
-48 ops, 30 types, 4 kernels, 63 Elixir tests, 6 Python tests, all static checks
+48 ops, 30 types, 4 kernels, 80 Elixir tests, 16 Python tests, all static checks
 green. No GPU has assembled or run any of it.

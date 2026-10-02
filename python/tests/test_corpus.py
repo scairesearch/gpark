@@ -13,7 +13,8 @@ import subprocess
 import unittest
 from pathlib import Path
 
-from gpark import decode_spec, emit, encode_spec, ops
+from gpark import decode_spec, emit, encode_spec, ir, ops
+from gpark import backend, ptx as ptx_mod
 from gpark import type as type_mod
 from gpark.validate import check
 
@@ -179,3 +180,97 @@ def _elixir_digest() -> str | None:
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestBackendGate(unittest.TestCase):
+    """The capability gate: refuse what cannot be emitted, and say why.
+
+    A gate that accepts everything is indistinguishable from no gate, so the bulk of
+    this builds kernels the PTX backend genuinely cannot handle and checks that each is
+    turned away with a specific reason.
+    """
+
+    def test_declared_capabilities_match_the_tables(self):
+        self.assertEqual(ptx_mod.ops(), ops.names())
+        self.assertEqual(ptx_mod.types(), type_mod.all_types())
+        self.assertEqual(len(ptx_mod.ops()), 48)
+        self.assertEqual(len(ptx_mod.types()), 30)
+
+    def test_required_ops_reads_terminators_too(self):
+        # A body-blind implementation would see no ops at all for a ret-only kernel.
+        k = ir.kernel("t", blocks=[ir.block("entry", [], ir.instr("ret"))])
+        self.assertEqual(backend.required_ops(k), {"ret"})
+
+    def test_required_types_ignores_untagged_instructions(self):
+        # `ret` and `bra` carry no dtype. Collecting that None would report every
+        # terminator as an unsupported type named None.
+        k = ir.kernel("t", blocks=[ir.block("entry", [], ir.instr("ret"))])
+        self.assertNotIn(None, backend.required_types(k))
+
+    def test_passes_every_corpus_kernel(self):
+        for path in SPECS:
+            k = decode_spec(path.read_text())
+            checked, issues = backend.require(ptx_mod, k)
+            self.assertEqual(issues, [], f"{path.name}: {issues}")
+            self.assertEqual(checked, k, "the gate must not transform the kernel")
+
+    def test_refuses_an_unsupported_opcode(self):
+        k = ir.kernel("t", blocks=[
+            ir.block("entry", [ir.instr("tensor::mma", dtype="f32")], ir.instr("ret"))
+        ])
+        _checked, issues = backend.require(ptx_mod, k)
+        self.assertEqual(issues, [("unsupported_op", "tensor::mma")])
+
+    def test_refuses_an_unsupported_type(self):
+        k = ir.kernel("t", blocks=[
+            ir.block("entry",
+                     [ir.instr("add", dtype="u128", dest=ir.reg("u128", 1),
+                               ops=[ir.reg("u128", 1), ir.imm(1)])],
+                     ir.instr("ret"))
+        ])
+        _checked, issues = backend.require(ptx_mod, k)
+        self.assertEqual(issues, [("unsupported_type", "u128")])
+
+    def test_reports_every_missing_capability_at_once(self):
+        k = ir.kernel("t", blocks=[
+            ir.block("entry",
+                     [ir.instr("tensor::mma", dtype="f32"),
+                      ir.instr("cvt", dtype="u128", dest=ir.reg("u128", 1),
+                               ops=[ir.reg("f32", 1)])],
+                     ir.instr("ret"))
+        ])
+        _checked, issues = backend.require(ptx_mod, k)
+        self.assertIn(("unsupported_op", "tensor::mma"), issues)
+        self.assertIn(("unsupported_type", "u128"), issues)
+
+    def test_emit_or_raise_names_the_missing_capability(self):
+        k = ir.kernel("t", blocks=[
+            ir.block("entry", [ir.instr("tensor::mma", dtype="f32")], ir.instr("ret"))
+        ])
+        with self.assertRaises(ValueError) as ctx:
+            backend.emit_or_raise(ptx_mod, k)
+        message = str(ctx.exception)
+        self.assertIn("tensor::mma", message)
+        self.assertIn("slower sequence", message)
+
+    def test_subbyte_types_are_declared_supportable(self):
+        # No direct PTX spelling, so `ptx_type` is None -- but they are representable,
+        # and the gate must not refuse a kernel on that technicality.
+        for name in ("s2", "u2", "s4", "u4"):
+            self.assertTrue(backend.supports_type(ptx_mod, name))
+            self.assertFalse(type_mod.native(name))
+
+    def test_require_and_check_answer_different_questions(self):
+        # A malformed kernel using nothing exotic is still within this backend's
+        # capabilities, so conflating the two would hide the real error.
+        k = ir.kernel("broken", blocks=[
+            ir.block("entry",
+                     [ir.instr("st", space="global", dtype="f32",
+                               ops=[ir.addr(ir.reg("u64", 1))])],
+                     ir.instr("ret"))
+        ])
+        checked, issues = backend.require(ptx_mod, k)
+        self.assertEqual(issues, [])
+        self.assertIsNotNone(checked)
+        _validated, problems = ptx_mod.check(k)
+        self.assertTrue(problems, "structural problems expected")

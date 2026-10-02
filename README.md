@@ -31,7 +31,7 @@ Treat that as the current state rather than a footnote.
 | Assembly — `make remote` | CUDA toolkit, no GPU | real hardware accepts it; register/spill numbers |
 | Execution — `make remote-build` | NVIDIA host + GPU | correct results, achieved bandwidth |
 
-48 opcodes, 30 types, 4 kernels, 63 Elixir tests, 6 Python tests, all static checks
+48 opcodes, 30 types, 4 kernels, 80 Elixir tests, 16 Python tests, all static checks
 green.
 
 ## The corpus

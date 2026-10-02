@@ -12,6 +12,7 @@ formatting were merely similar, every such diff would be noise.
 Nothing here needs a GPU. See ``docs/ROADMAP.md`` for status.
 """
 
+from gpark.backend import emit_or_raise, require, required_ops, required_types
 from gpark.ir import block, imm, instr, kernel, label, param, param_decl, pred, reg, sreg
 from gpark.json_codec import decode as decode_spec
 from gpark.json_codec import encode as encode_spec

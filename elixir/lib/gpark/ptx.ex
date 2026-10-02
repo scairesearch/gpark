@@ -15,6 +15,8 @@ defmodule Gpark.PTX do
 
   alias Gpark.IR
 
+  @behaviour Gpark.Backend
+
   # PTX has no fixed register classes, but nvcc's ordering is a good convention
   # to follow: predicates, then 32-bit, then 64-bit, then the float banks.
   @class_order %{p: 0, r: 1, rd: 2, f: 3, fd: 4}
@@ -28,7 +30,46 @@ defmodule Gpark.PTX do
       iex> Gpark.PTX.emit(k) =~ ".target sm_80"
       true
   """
+  @impl Gpark.Backend
   def emit(%{} = kernel), do: kernel |> sections() |> IO.iodata_to_binary()
+
+  @doc "A short name for this backend."
+  @impl Gpark.Backend
+  def name, do: :ptx
+
+  @doc """
+  Every opcode base gpark can render.
+
+  The table is the single source of truth, so this cannot drift from what `emit/1`
+  is willing to spell. A backend whose list was hand-kept would eventually claim an
+  opcode it refuses and reject one it can handle, and the gate would be worse than
+  no gate.
+  """
+  @impl Gpark.Backend
+  def ops, do: Gpark.Ops.names()
+
+  @doc """
+  Every type gpark can represent.
+
+  Includes the four sub-byte types, which have no direct PTX spelling: `ptx_type/1`
+  returns `nil` for a bare `:u4` because PTX cannot name one. They are declared
+  supported because they are representable rather than merely named -- packed into a
+  container (`Type.packed(:u32, :u4, 8)`, whose `ptx_type/1` is `:u32`) or widened
+  before arithmetic (`Type.widen(:u4) == :u16`). Dropping them from this list would
+  make `Backend.require!/2` reject every sub-byte kernel on a technicality.
+  """
+  @impl Gpark.Backend
+  def types, do: Gpark.Type.all()
+
+  @doc """
+  Structural validation, delegated to `Gpark.Validate`.
+
+  Separate from `Gpark.Backend.require!/2` on purpose: this reports a kernel that is
+  malformed, where `require!/2` reports a kernel that is fine but outside this
+  backend's capabilities. A kernel can pass one and fail the other.
+  """
+  @impl Gpark.Backend
+  def check(kernel), do: Gpark.Validate.check(kernel)
 
   @doc "Render a kernel and write it to `path`."
   def emit!(%{} = kernel, path) do
