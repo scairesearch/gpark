@@ -109,6 +109,23 @@ every golden's provenance.
 `srctype` is nullable and round-trips as `null`. Sub-byte kernels need no source
 type on their element loads, so requiring one would mean inventing a fake.
 
+### `Gpark.Opt.Simplify` — fixpoint simplification
+
+Runs rules until nothing fires. v0.1 has two: unreachable blocks, and dead
+side-effect-free instructions. Two constraints are deliberate rather than incidental:
+
+- **Loads are never removed.** A dead load can still fault, and removing it would
+  hide the out-of-bounds bug `unpack_u4_f32` actually had. See `DECISIONS.md`.
+- **Opcode purity is an explicit list.** An unclassified opcode is `:unknown`, which
+  is not `:pure`, so a new opcode is kept until someone says otherwise.
+
+`simplify/2` returns per-rule counts including zeros, so a rule that never fires is
+distinguishable from a rule that does not exist — the distinction that caught a
+`dest_id/1` bug that had made the pass a silent no-op.
+
+On the current corpus every rule reports zero: the four kernels are hand-minimal.
+That is a claim worth keeping honest, and `simplify_test.exs` asserts it.
+
 ## Kernels
 
 Four, and the rule for adding one is that it must force something new in the

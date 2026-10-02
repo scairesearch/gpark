@@ -264,3 +264,86 @@ the feature to have it is how backends accumulate surface they cannot justify.
 
 **Trigger.** A kernel that cannot be written without it. Recorded in `ROADMAP.md` with
 the two candidates already identified.
+
+---
+
+## Adopting Taichi's `full_simplify` fixpoint
+
+**Decided.** `Gpark.Opt.Simplify` iterates rules until nothing fires, rather than
+running a fixed number of passes.
+
+**Why.** A bounded pass count makes optimisation quality depend on a tuning constant
+nobody understands, and it fails silently: the output is still correct, just less
+simplified, so nothing anywhere tells you to raise the bound. The correctness shows
+up as slow PTX on hardware nobody is watching. A fixpoint either converges or a rule
+is wrong, and `simplify/2` raises on non-convergence rather than returning a
+half-simplified kernel.
+
+**Gave up.** The ability to bound compile time in the pathological case. Kernels this
+size cannot hit the guard; if one ever does, the rule is oscillating and that is a bug
+worth surfacing rather than papering over.
+
+**Rule set in v0.1 is deliberately two rules:** unreachable blocks, and dead
+side-effect-free instructions. See the next two entries for why the set is not larger.
+
+---
+
+## Dead loads are not dead code
+
+**Decided.** `Gpark.Opt.Simplify` never removes a `ld`, even when its destination is
+never read. Every normal compiler does remove them.
+
+**Why.** A load whose result is unused can still fault, and removing it silently
+deletes the evidence of an out-of-bounds access.
+
+This is not hypothetical. `unpack_u4_f32` once emitted its bounds guard *after* the
+work it guarded, so every out-of-range lane performed a 32-byte out-of-bounds write.
+A dead-load rule would have removed the faulting load and left a kernel that looks
+clean and is still wrong. The bug was found by property tests asserting that stores
+follow their guard; a simplifier willing to delete the load is exactly the thing that
+would have hidden it.
+
+The cost is real: dead loads survive into the PTX and occupy register lifetimes. That
+is the correct trade for a backend whose entire premise is that you can see every
+instruction and reason about it. A rule that hides faults is worse than a missed
+optimisation.
+
+**Reversible?** No, unless gpark grows a memory-safety proof that no load address is
+out of bounds. That proof does not exist yet.
+
+---
+
+## Opcode purity is classified explicitly, never inferred
+
+**Decided.** Every one of the 48 opcodes is listed in `Gpark.Opt.Simplify` as either
+pure or impure, and a test fails CI if the table grows an unclassified opcode.
+
+**Why.** The obvious implementation is a prefix test — `String.starts_with?(base,
+"st")` for stores, and treat everything else as arithmetic. That is silently wrong the
+day someone adds an opcode: anything unrecognised falls through as "pure", and the
+pass starts deleting instructions that write memory.
+
+`classify/1` therefore returns `:unknown` as a real answer rather than defaulting, and
+`:unknown` is not `:pure`. An unclassified opcode is kept.
+
+**Note.** `classify/1` takes a base name (`"red"`), because the IR keeps space,
+modifier and vector width in separate fields. A fully-spelled opcode like
+`red.global.add.s32` is never handed to it, and lands on `:unknown`.
+
+---
+
+## What gpark is *not* adopting from Taichi
+
+Recorded so the omissions read as decisions rather than as work not reached.
+
+| Taichi | gpark | Reason |
+| --- | --- | --- |
+| `full_simplify` | **Adopted** | Fixpoint over rules. See above. |
+| Neutral SIR / no language coupling | **Partly adopted** | gpark's IR is already neutral, but nothing enforces it. `Gpark.Backend` behaviour is the enforcement; not yet written. |
+| `ti.kernel` / `ti.data` Pythonic surface | **Planned** | The DSL is the ergonomics answer. Not written. |
+| Reverse-mode autodiff | **Declined** | gpark has no runtime and no tape. Adding one means owning a graph format and a backward pass, which is a second project. The quant interest here is explicit quantisation, not learning. |
+| Runtime, `ti.init()`, memory pools | **Declined** | Launch overhead and allocation are exactly what gpark wants visible. A pool hides the allocation the benchmark is measuring. |
+| Vulkan / Metal / OpenGL backends | **Declined** | gpark's premise is direct PTX at instruction level. Multi-API is a different project with a different justification. |
+| `ti.fuse` (loop fusion) | **Deferred** | Needs the loop machinery, which needs SSA — see the no-SSA entry. |
+| Aggressive vectorisation | **Deferred** | `vec_add_f32_v4` is in the corpus to pin the surface down; tuning it needs a GPU to measure against. |
+| Autotuning templates | **Declined** | gpark has one target and no measured hardware baseline yet. An autotuner with no roofline to search is just a random number generator. |
