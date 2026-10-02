@@ -18,8 +18,9 @@ classifiers = [
 dependencies = []
 
 [project.urls]
-Homepage = "https://github.com/gpark/gpark"
-Source = "https://github.com/gpark/gpark"
+Homepage = "https://github.com/scairesearch/gpark"
+Source = "https://github.com/scairesearch/gpark"
+Changelog = "https://github.com/scairesearch/gpark/blob/main/CHANGELOG.md"
 
 [build-system]
 requires = ["hatchling"]
@@ -31,3 +32,18 @@ packages = ["gpark"]
 [tool.ruff]
 line-length = 100
 target-version = "py311"
+
+# Known gap: the canonical AGPL text is at the repository root, one level up, and
+# hatchling cannot reach it from here.
+#   * force-include "../LICENSE" works when building the wheel directly, but breaks
+#     `python -m build`, which builds the wheel from the unpacked sdist where the path
+#     no longer resolves.
+#   * license-files = ["../LICENSE"] builds, but writes a member literally named
+#     `licenses/../LICENSE` into the archive, because the `..` is not sanitised.
+# Copying LICENSE in here instead would duplicate a legal document and let the two
+# copies drift. So the distribution declares `license = "AGPL-3.0-or-later"` above,
+# which is what PyPI displays and what tooling reads, and does not carry the text.
+#
+# The real fix is to move this pyproject.toml to the repository root so LICENSE is in
+# the project directory. That is a packaging restructure, not a metadata edit, so it
+# has not been done here.

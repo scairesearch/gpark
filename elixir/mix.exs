@@ -10,8 +10,7 @@ defmodule GPark.MixProject do
       elixirc_paths: elixirc_paths(Mix.env()),
       deps: deps(),
       description: description(),
-      package: package(),
-      docs: docs()
+      package: package()
     ]
   end
 
@@ -36,27 +35,17 @@ defmodule GPark.MixProject do
   defp package do
     [
       licenses: ["AGPL-3.0"],
-      links: %{"GitHub" => "https://github.com/gpark/gpark"},
-      files: ~w(lib .formatter.exs mix.exs README* LICENSE* CHANGELOG*)
-    ]
-  end
-
-  defp docs do
-    [
-      main: "readme",
-      extras: [
-        "README.md",
-        "CHANGELOG.md",
-        "LICENSE",
-        "docs/ARCHITECTURE.md",
-        "docs/QUANT.md",
-        "docs/PTX-SUBSET.md",
-        "docs/VALIDATION.md",
-        "docs/ROADMAP.md",
-        "docs/DECISIONS.md",
-        "docs/CONTEXT.md",
-        "docs/GLOSSARY.md"
-      ]
+      links: %{
+        "GitHub" => "https://github.com/scairesearch/gpark",
+        "Changelog" => "https://github.com/scairesearch/gpark/blob/main/CHANGELOG.md"
+      },
+      # Only paths that exist *inside* this directory. `mix hex.publish` builds the
+      # tarball from the mix project root, which is `elixir/`, so the repository's
+      # README, LICENSE and CHANGELOG one level up cannot be listed here -- a glob
+      # naming them silently matches nothing and ships a tarball with no licence in
+      # it. The `licenses` metadata above is what the registry displays and enforces;
+      # the canonical text lives at the repository root.
+      files: ~w(lib .formatter.exs mix.exs)
     ]
   end
 end
