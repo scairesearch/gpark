@@ -176,6 +176,73 @@ defmodule Gpark.ValidateTest do
     end
   end
 
+  describe "exit counting" do
+    # `note_exit/2` used to issue :multiple_exits on the *first* `exit`, which meant
+    # every kernel with any exit at all was flagged -- a check that always fires and
+    # therefore gets ignored. The first exit is how a kernel legitimately returns;
+    # only later ones are redundant.
+    test "a single exit is not reported" do
+      k = kernel_with([], IR.instr("exit"))
+      refute :multiple_exits in issues_for(k)
+    end
+
+    test "a second exit is reported" do
+      blocks = [
+        IR.block(:a, [], IR.instr("exit")),
+        IR.block(:b, [], IR.instr("exit"))
+      ]
+
+      k = IR.kernel(:t, params: [IR.param_decl(:x, :u64)], blocks: blocks)
+      assert :multiple_exits in issues_for(k)
+    end
+
+    test "multiple rets are not exits" do
+      # An early-return block plus a `done` block legitimately contains several
+      # `ret`s; PTX is perfectly happy with that.
+      blocks = [
+        IR.block(:entry, [], IR.instr("ret")),
+        IR.block(:done, [], IR.instr("ret"))
+      ]
+
+      k = IR.kernel(:t, params: [IR.param_decl(:x, :u64)], blocks: blocks)
+      refute :multiple_exits in issues_for(k)
+    end
+  end
+
+  describe "signedness" do
+    # These both delegated to Type.int?/1, so signed_type? answered "true" for
+    # :u32 and unsigned_type? answered "true" for :i32. Sign is what tells a
+    # comparison instruction which predicate modifier to emit, so a caller relying
+    # on either would have generated a wrapped-vs-signed comparison.
+    test "distinguishes signed from unsigned" do
+      assert IR.signed_type?(:s32)
+      assert IR.signed_type?(:s64)
+      refute IR.signed_type?(:u32)
+
+      assert IR.unsigned_type?(:u32)
+      assert IR.unsigned_type?(:u64)
+      refute IR.unsigned_type?(:s32)
+    end
+
+    test "rejects non-integers" do
+      refute IR.signed_type?(:f32)
+      refute IR.unsigned_type?(:f32)
+      refute IR.signed_type?(:pred)
+    end
+
+    test "resolves packed sub-byte types" do
+      # Type.sign/1 recurses through the container, so a packed s4 is signed even
+      # though its storage is a b32.
+      signed = Gpark.Type.packed(:b32, :s4, 8)
+      unsigned = Gpark.Type.packed(:b32, :u4, 8)
+
+      assert IR.signed_type?(signed)
+      refute IR.unsigned_type?(signed)
+      assert IR.unsigned_type?(unsigned)
+      refute IR.signed_type?(unsigned)
+    end
+  end
+
   describe "reporting" do
     test "reports every problem, not just the first" do
       instrs = [

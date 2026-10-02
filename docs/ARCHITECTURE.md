@@ -39,9 +39,9 @@ Notable shapes:
 - `cvt` takes source and destination types: `cvt.rn.f32.u32`, not a guessed pair.
   Integer↔float conversion is not inferable from operands.
 - Bitwise ops (`and`, `or`, `xor`, `not`, `shl`, `shr`) accept *bit-container* types
-  (`u4`, `s4`, …) and require `u32` storage. This is the whole sub-byte mechanism:
-  there is no packed arithmetic in hardware, so a `u4` value lives in a `.b32`
-  register and every operation on it is a 32-bit op plus a mask.
+  (`:b16`, `:b32`, `:b64`) alongside the integer types. This is the whole
+  sub-byte mechanism: there is no packed arithmetic in hardware, so a 4-bit value
+  lives in a `.b32` register and every operation on it is a 32-bit op plus a mask.
 - `otypes` is enforced rather than advisory. An instruction that produces `f32`
   cannot be given a `.u32` register, which is how a real class of emitter bug
   surfaced during development.
@@ -69,15 +69,20 @@ exists because of sub-byte data.
 Two questions, previously conflated into one list:
 
 - **Container** — how many bits does this register hold? `b1 b2 b4 b8 b16 b32 b64`
-- **Element format** — what do those bits mean? `u2 s2 u4 s4 s8 i8 f16 bf16 f32 f64
-  e4m3 e5m2 fp4 pred`
+- **Element format** — what do those bits mean? `s2 u2 s4 u4 s8 u8 s16 u16 s32 u32
+  s64 u64 f16 bf16 f32 f64 e2m1 e2m3 e3m2 e4m3 e5m2 e8m0 pred`
 
-30 types total. Conflating them makes `u4` look like a thing the hardware can
-compute on, and it cannot — it is 4 bits of storage inside a `.b32`.
+30 types total, 26 with a direct PTX spelling and four (`s2 u2 s4 u4`) that exist
+only inside a packed container. Conflating the two lists makes `u4` look like a
+thing the hardware can compute on, and it cannot — it is 4 bits inside a `.b32`.
 
-`Packed` carries a sub-byte logical type alongside its `u32` storage. Ops validate
-against the logical type while register allocation sees only the storage width, so
-the hardware-facing layer stays ignorant of the packing.
+`Packed` carries a sub-byte logical type (`s2`…`u4`) alongside its container width.
+`Gpark.Type.describe/1` resolves both tables through one lookup, so `width`, `kind`
+and `sign` cannot disagree about what a sub-byte type is.
+
+Worth being precise about: `unpack_u4_f32` does **not** use `Packed`. It hand-rolls
+shift/mask/convert on `:u32` registers, because that is expressible today. `Packed`
+exists and is introspectable but no corpus kernel uses it yet — see `ROADMAP.md`.
 
 ### `Gpark.PTX` — the emitter
 

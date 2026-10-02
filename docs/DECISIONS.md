@@ -65,9 +65,9 @@ constantly and is the correct trade.
 
 ## Sub-byte types are packed bit containers, not arithmetic types
 
-**Decided.** `u2 s2 u4 s4` and friends carry a *logical* type alongside `u32`
-*storage*. Ops validate against the logical type; allocation sees only the storage
-width.
+**Decided.** `s2 u2 s4 u4` are logical types with *no* direct PTX spelling, which is
+what keeps the backend from believing they are arithmetic. They exist as the element
+of a `Packed` value, whose *container* (`:b16`/`:b32`/`:b64`) is what allocates.
 
 **Why.** PTX has no 4-bit float arithmetic, and 4-bit packed *integer* ops exist but
 cover neither floats nor most of the operations a quantised kernel needs.
@@ -80,7 +80,8 @@ wrong about occupancy, register pressure, and memory traffic — which is exactl
 information gpark exists to expose.
 
 **Gave up.** Convenience. `unpack_u4_f32` writes eight shift/mask/convert/store
-sequences that a hypothetical packed instruction could halve.
+sequences that a hypothetical packed instruction could halve, and does so on `:u32`
+registers rather than through `Packed`, which is a known gap rather than a design.
 
 **Note.** The container/element split (`b32` vs `f32`) came out of this and now
 applies to every type: 30 types, 8 containers.

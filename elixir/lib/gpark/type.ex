@@ -91,8 +91,17 @@ defmodule Gpark.Type do
     pred: {32, :pred, :unsigned}
   }
 
-  # s2/u2/s4/u4 are not PTX types at all; their width is implied by the name.
-  @sub_byte %{s2: 2, u2: 2, s4: 4, u4: 4}
+  # s2/u2/s4/u4 are not PTX types at all, so they are deliberately absent from
+  # @native -- that absence is exactly what stops the backend believing `u4` is
+  # something it can do arithmetic on. They still carry {bits, kind, sign}, because
+  # a packed element type that cannot answer width, kind or sign is not much of a
+  # type: all three returned nil, which made `s4` indistinguishable from garbage.
+  @sub_byte %{
+    s2: {2, :int, :signed},
+    u2: {2, :int, :unsigned},
+    s4: {4, :int, :signed},
+    u4: {4, :int, :unsigned}
+  }
 
   # The native type a sub-byte element widens to before arithmetic.
   @widen %{
@@ -116,15 +125,27 @@ defmodule Gpark.Type do
   @doc "All natively-supported PTX types, sorted."
   def native_names, do: @native |> Map.keys() |> Enum.sort()
 
+  @doc """
+  The `{bits, kind, sign}` description of a type, or `nil` if it has none.
+
+  Checks `@native` first, then `@sub_byte`. Funnelling all three of `width/1`,
+  `kind/1` and `sign/1` through one lookup means they cannot disagree about what a
+  type is -- previously each consulted `@native` on its own, so every sub-byte type
+  silently answered `nil` from all three.
+  """
+  def describe(type) when is_atom(type) do
+    Map.get(@native, type) || Map.get(@sub_byte, type)
+  end
+
   @doc "True when `type` has a direct PTX spelling."
   def native?(type) when is_atom(type), do: Map.has_key?(@native, type)
   def native?(%Packed{}), do: false
 
   @doc "Storage width of a native type in bits. Nil for packed types."
   def width(type) when is_atom(type) do
-    case Map.fetch(@native, type) do
-      {:ok, {bits, _kind, _sign}} -> bits
-      :error -> nil
+    case describe(type) do
+      {bits, _kind, _sign} -> bits
+      nil -> nil
     end
   end
 
@@ -132,9 +153,9 @@ defmodule Gpark.Type do
 
   @doc "One of `:int`, `:float`, `:bit`, `:pred`, or `:quant`."
   def kind(type) when is_atom(type) do
-    case Map.fetch(@native, type) do
-      {:ok, {_bits, kind, _sign}} -> kind
-      :error -> nil
+    case describe(type) do
+      {_bits, kind, _sign} -> kind
+      nil -> nil
     end
   end
 
@@ -148,13 +169,34 @@ defmodule Gpark.Type do
 
   @doc ":signed or `:unsigned`."
   def sign(type) when is_atom(type) do
-    case Map.fetch(@native, type) do
-      {:ok, {_bits, _kind, sign}} -> sign
-      :error -> nil
+    case describe(type) do
+      {_bits, _kind, sign} -> sign
+      nil -> nil
     end
   end
 
   def sign(%Packed{elem: elem}), do: sign(elem)
+
+  @doc """
+  True for signed *integers*, including packed sub-byte ones.
+
+  Deliberately not `sign/1 == :signed`: the native table records a sign for floats
+  too, because `f32` has a sign bit. That is a different question from whether a
+  type is a signed integer, and conflating them makes `signed_type?(:f32)` answer
+  true -- which would then pick a signed comparison modifier for a float compare.
+  """
+  def signed_int?(%Packed{elem: elem}), do: signed_int?(elem)
+
+  def signed_int?(type) when is_atom(type) do
+    match?({_bits, :int, :signed}, describe(type))
+  end
+
+  @doc "True for unsigned *integers*, including packed sub-byte ones."
+  def unsigned_int?(%Packed{elem: elem}), do: unsigned_int?(elem)
+
+  def unsigned_int?(type) when is_atom(type) do
+    match?({_bits, :int, :unsigned}, describe(type))
+  end
 
   # ---------------------------------------------------------------------------
   # Packed (sub-byte / multi-lane) types
@@ -215,7 +257,12 @@ defmodule Gpark.Type do
       iex> Gpark.Type.sub_byte_width(:u4)
       4
   """
-  def sub_byte_width(type), do: Map.get(@sub_byte, type)
+  def sub_byte_width(type) do
+    case Map.get(@sub_byte, type) do
+      {bits, _kind, _sign} -> bits
+      nil -> nil
+    end
+  end
 
   @doc "The PTX type a gpark type is stored and manipulated as."
   def ptx_type(%Packed{container: container}), do: container

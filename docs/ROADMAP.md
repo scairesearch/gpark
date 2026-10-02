@@ -65,6 +65,10 @@ memory, not a desire to have it.
 - [ ] Vectorised `.v4` access, used at last. `vec_add_f32` is scalar on purpose: if
       vectorising it does not measurably beat it, the addressing is wrong, and that
       is worth knowing before tiling builds on it.
+- [ ] A kernel that actually uses `Gpark.Type.Packed`. `unpack_u4_f32` hand-rolls
+      shift/mask/convert on `:u32` registers, so the packed representation is
+      exercised only by doctests. It should be exercised by a kernel before any
+      performance claim is made about sub-byte work.
 - [ ] Register allocator with live-range splitting, and `Gpark.Mid` SSA with phi
       nodes to replace the unrolled unpack body.
 - [ ] Cross-backend parity gate: Metal and AMDGCN must pass the same corpus, and CI

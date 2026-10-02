@@ -53,8 +53,8 @@ defmodule Gpark.IR do
   defdelegate kind(type), to: Gpark.Type
 
   defdelegate float_type?(type), to: Gpark.Type, as: :float?
-  defdelegate signed_type?(type), to: Gpark.Type, as: :int?
-  defdelegate unsigned_type?(type), to: Gpark.Type, as: :int?
+  defdelegate signed_type?(type), to: Gpark.Type, as: :signed_int?
+  defdelegate unsigned_type?(type), to: Gpark.Type, as: :unsigned_int?
   def predicate_type?(type), do: type == :pred
 
   @doc """

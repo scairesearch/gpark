@@ -38,9 +38,10 @@ What it checks:
 - **Types.** Operand types match the opcode signature. Declared operand types must
   equal the opcode's declared output type — an instruction whose register is `.u32`
   cannot produce `f32`.
-- **Bit containers.** `shl`/`shr`/`and`/`or`/`xor`/`not` on `u4`/`s4`-style types
-  operate on `u32` storage, and the validator enforces that. Sub-byte values are not
-  given their own registers or their own arithmetic.
+- **Bit containers.** `shl`/`shr`/`and`/`or`/`xor`/`not` accept the bit containers
+  `:b16 :b32 :b64` alongside the integer types, and the validator enforces the
+  declared type matches the opcode. Sub-byte values get no register class and no
+  arithmetic of their own.
 - **Initialisation.** Reads on a register that no reachable path has written are
   reported. (This check is a linear approximation, not a dataflow fixpoint — see
   the limits section below.)
@@ -133,19 +134,25 @@ none.
   register state and does not merge across branches, so a register written on one
   path and read on another can be reported wrongly in either direction. A real
   dataflow analysis is deferred until a kernel needs it.
-- **`:multiple_exits` is misnamed.** The check flags *any* explicit `exit`, not
-  exits beyond the first. The intent was to catch redundant exits; the implementation
-  catches all of them. Currently every `exit` in the corpus would be reported. It
-  has not been fixed because no kernel uses `exit`, and renaming it would change
-  behaviour nobody depends on yet.
+- **Nothing exercises `exit`.** The multiple-exit check counts properly now — only the
+  second and later `exit` are reported — but no kernel uses `exit`, so the check and
+  its fix are unverified against real IR. A test covers the counting directly; the
+  emitter path for `exit` does not exist.
 - **Two backend implementations are already duplicated.** Elixir and Python exist to
   catch drift, which they do — and they cost real effort. If a third backend is
   added before the corpus grows, the maintenance cost may exceed the drift cost.
   `ARCHITECTURE.md` records the reasoning.
-- **Sub-byte arithmetic is not validated against hardware.** `u4`/`s4` are packed
-  bit containers with no native arithmetic. The validator can prove the bit
-  manipulation is self-consistent. It cannot prove a packed multiply is right,
-  because packed multiply does not exist yet.
-- **`signed_type?`/`unsigned_type?` share an implementation.** `Gpark.IR` delegates
-  both to `Gpark.Type.int?/1`, so neither currently distinguishes sign. Unused by
-  any kernel, untested, and a trap for whoever writes the first signed kernel.
+- **Sub-byte arithmetic is not validated against hardware.** `s2`…`u4` are
+  introspectable logical types with no native arithmetic. The validator can prove
+  the bit manipulation is self-consistent. It cannot prove a packed multiply is
+  right, because packed multiply does not exist yet.
+
+  Relatedly, **no corpus kernel uses `Gpark.Type.Packed`.** `unpack_u4_f32`
+  hand-rolls the unpack on `:u32` registers, so the packed path is exercised only by
+  its doctests. The first kernel that uses it should come before any performance
+  claim about sub-byte work.
+- **`signed_int?`/`unsigned_int?` are still unused.** Both used to delegate to
+  `Type.int?/1`, so `signed_type?(:u32)` and `unsigned_type?(:s32)` both answered
+  true. Fixed, and now distinguished from floats — the native table records a sign for
+  `f32` too, so sign alone would report a float as a signed integer. No kernel calls
+  them yet, so the first signed comparison is where this gets exercised for real.

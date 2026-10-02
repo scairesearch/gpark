@@ -141,7 +141,16 @@ defmodule Gpark.Validate do
   # code. Multiple `exit`s, by contrast, really do mean divergent threads are being
   # torn down twice.
   defp note_exit(%{base: "exit"}, ctx) do
-    issue(ctx, :multiple_exits, "kernel contains more than one exit")
+    # The first `exit` is how a kernel legitimately returns; only the second and
+    # later ones are redundant. Reporting the first flags every kernel that has an
+    # exit at all, which is a check that cries wolf and gets ignored.
+    ctx = %{ctx | exits: ctx.exits + 1}
+
+    if ctx.exits > 1 do
+      issue(ctx, :multiple_exits, "kernel contains more than one exit")
+    else
+      ctx
+    end
   end
 
   defp note_exit(_, ctx), do: ctx

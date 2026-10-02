@@ -103,10 +103,12 @@ first thing that makes multi-block kernels possible.
 
 ## Sub-byte types
 
-`u2 s2 u4 s4 u6 s6 fp4` and friends are **packed bit containers**. There is no
-packed arithmetic in hardware, so:
+Sub-byte *element* types — `s2 u2 s4 u4` — are registered but have **no direct PTX
+spelling**, which is the point: `native?(:u4)` is false. The types that bitwise ops
+actually accept are the bit containers `:b16 :b32 :b64`. There is no packed
+arithmetic in hardware, so:
 
-- A `u4` lives in a `.b32` register.
+- A `u4` value lives in a `.b32` register, reached through `Gpark.Type.Packed`.
 - Operations validate against the logical type but allocate against storage width.
 - Extracting 8 `f32` from one `u32` is: shift to position, `and.b32` with a 4-bit
   mask, `cvt.rn.f32.u32`, store. 8 shifts, 8 masks, 8 conversions, 8 stores per
