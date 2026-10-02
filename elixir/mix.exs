@@ -4,7 +4,7 @@ defmodule GPark.MixProject do
   def project do
     [
       app: :gpark,
-      version: "0.1.0-dev",
+      version: "0.1.0",
       elixir: "~> 1.16",
       start_permanent: Mix.env() == :prod,
       elixirc_paths: elixirc_paths(Mix.env()),

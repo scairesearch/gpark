@@ -1,6 +1,6 @@
 [project]
 name = "gpark"
-version = "0.1.0.dev0"
+version = "0.1.0"
 description = "Hand-written PTX kernels for quant, ML, RL and agentic workloads"
 readme = "README.md"
 requires-python = ">=3.11"
