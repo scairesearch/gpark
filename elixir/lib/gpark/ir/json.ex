@@ -99,7 +99,7 @@ defmodule Gpark.IR.JSON do
   # Instructions
   # ---------------------------------------------------------------------------
 
-  @keys ~w(base space modifier vec dtype dest ops pred)
+  @keys ~w(base space modifier vec dtype srctype dest ops pred)
 
   # Atom handling is split deliberately, because the two kinds of name have
   # opposite safety properties:
@@ -130,6 +130,7 @@ defmodule Gpark.IR.JSON do
       modifier: m["modifier"],
       vec: m["vec"],
       dtype: m["dtype"] && vocab(m["dtype"]),
+      srctype: m["srctype"] && vocab(m["srctype"]),
       dest: m["dest"] && from_operand(m["dest"]),
       ops: Enum.map(m["ops"] || [], &from_operand/1),
       pred: m["pred"] && from_operand(m["pred"])
@@ -145,6 +146,7 @@ defmodule Gpark.IR.JSON do
          "modifier" -> i.modifier
          "vec" -> i.vec
          "dtype" -> i.dtype && to_string(i.dtype)
+         "srctype" -> i.srctype && to_string(i.srctype)
          "dest" -> i.dest && to_operand(i.dest)
          "ops" -> Enum.map(i.ops, &to_operand/1)
          "pred" -> i.pred && to_operand(i.pred)

@@ -54,7 +54,7 @@ SREG_NAMES = {
 }
 
 # Keys every instruction dict carries, in the order the JSON codec writes them.
-INSTR_KEYS = ("base", "space", "modifier", "vec", "dtype", "dest", "ops", "pred")
+INSTR_KEYS = ("base", "space", "modifier", "vec", "dtype", "srctype", "dest", "ops", "pred")
 
 
 # ---------------------------------------------------------------------------
@@ -142,6 +142,7 @@ def instr(base: str, **opts: Any) -> dict:
         "modifier": opts.get("modifier"),
         "vec": opts.get("vec"),
         "dtype": opts.get("dtype"),
+        "srctype": opts.get("srctype"),
         "dest": opts.get("dest"),
         "ops": list(opts.get("ops", [])),
         "pred": opts.get("pred"),

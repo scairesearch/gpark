@@ -54,6 +54,7 @@ Gpark.Ops.table()
     otypes,
     optional.(s.spaces),
     optional.(s.modifiers),
+    optional.(s.srcs),
     to_string(s.sync)
   ], "|")
 end)

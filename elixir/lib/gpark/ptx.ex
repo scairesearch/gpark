@@ -138,11 +138,20 @@ defmodule Gpark.PTX do
          modifier: modifier,
          vec: vec,
          dtype: dtype,
+         srctype: srctype,
          dest: dest,
          ops: ops,
          pred: pred
        }) do
-    opcode = opcode(%{base: base, space: space, modifier: modifier, vec: vec, dtype: dtype})
+    opcode =
+      opcode(%{
+        base: base,
+        space: space,
+        modifier: modifier,
+        vec: vec,
+        dtype: dtype,
+        srctype: srctype
+      })
 
     [guard(pred), opcode, join_args(dest, ops), ";\n"]
   end
@@ -182,6 +191,7 @@ defmodule Gpark.PTX do
       :modifier -> if instr.modifier, do: [".", instr.modifier], else: ""
       :vec -> if instr.vec, do: [".v", Integer.to_string(instr.vec)], else: ""
       :dtype -> if instr.dtype, do: [".", to_string(instr.dtype)], else: ""
+      :srctype -> if instr.srctype, do: [".", to_string(instr.srctype)], else: ""
     end)
   end
 

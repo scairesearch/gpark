@@ -171,6 +171,12 @@ def _check_types(spec, i, block, index, ctx) -> None:
 
     _check_operand_types(spec, i, block, index, ctx)
 
+    if spec.srcs is not None and i["srctype"] not in spec.srcs:
+        allowed = ", ".join(spec.srcs)
+        ctx.issue("bad_source_type",
+                  f"{i['base']} does not convert from {i['srctype']!r} (allowed: {allowed})",
+                  block["label"], index)
+
 
 def _check_operand_types(spec, i: dict, block: dict, index: int, ctx: Context) -> None:
     """The ``otypes`` column, enforced.

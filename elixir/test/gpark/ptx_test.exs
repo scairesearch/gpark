@@ -117,17 +117,26 @@ defmodule Gpark.PTXTest do
     end
 
     test "covers the intended kernel families" do
-      # Guards against a corpus that quietly stops testing anything: these three
-      # force scalar indexing, a fused arithmetic op, and warp shuffles.
-      assert kernel_names() == ["reduce_sum_f32", "saxpy_f32", "vec_add_f32"]
+      # Guards against a corpus that quietly stops testing anything.
+      assert kernel_names() ==
+               ["reduce_sum_f32", "saxpy_f32", "unpack_u4_f32", "vec_add_f32"]
 
-      # Scalar indexing, a fused arithmetic op, and warp shuffles are the three
-      # things a naive emitter gets wrong; all three are now pinned by a golden.
+      # Each of these is something a naive emitter gets wrong, so each is pinned
+      # by opcode shape rather than left to the byte-for-byte comparison alone:
+      # 64-bit widening, a fused arithmetic op, warp shuffles, and the two-type
+      # conversion that sub-byte work is entirely made of.
       assert File.read!(Path.join(Gpark.Golden.dir(), "vec_add_f32.ptx")) =~ "mul.wide.u32"
       assert File.read!(Path.join(Gpark.Golden.dir(), "saxpy_f32.ptx")) =~ "fma.rn.f32"
 
       assert File.read!(Path.join(Gpark.Golden.dir(), "reduce_sum_f32.ptx")) =~
                "shfl.sync.bfly.f32"
+
+      quant = File.read!(Path.join(Gpark.Golden.dir(), "unpack_u4_f32.ptx"))
+      # A rounding mode *and* a source type, which is what PTX requires.
+      assert quant =~ "cvt.rn.f32.u32"
+      # Masking a u32 word: only expressible because the bit-container types are
+      # in the table's operand set for the bitwise ops.
+      assert quant =~ "and.u32"
     end
 
     defp kernel_names, do: specs() |> Enum.map(&Path.basename(&1, ".json"))

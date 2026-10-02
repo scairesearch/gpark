@@ -34,7 +34,14 @@ _INT32 = ("s32", "u32")
 _INT64 = ("s64", "u64")
 _INT_ALL = _INT32 + _INT64
 _FLOATS = ("f32", "f64")
+
+# PTX performs bitwise and shift arithmetic on .b16/.b32 as well as on the signed
+# and unsigned integer types. Without these, unpacking a 4-bit weight is
+# impossible: masking a .b32 word is not expressible in the int types.
+_BINTS = ("b16", "b32", "b64")
+_BIT_OPS = _INT_ALL + _BINTS
 _MEM_TYPES = _INT_ALL + _FLOATS + ("b64",)
+_MEM_OR_BITS = _MEM_TYPES + ("b16", "b32")
 
 _LOAD_SPACES = ("global", "shared", "local", "const", "param")
 _MEM_SPACES = ("global", "shared", "local", "param")
@@ -52,13 +59,20 @@ class OpSpec(NamedTuple):
     otypes: Any
     spaces: tuple[str, ...] | None = None
     modifiers: tuple[str | None, ...] | None = None
+    srcs: tuple[str, ...] | None = None
     sync: bool = False
 
 
 _SPECS: tuple[OpSpec, ...] = (
     # data movement / conversion
     OpSpec("mov", ("name", "dtype"), _MEM_TYPES + ("pred",), 1, 1, "same", sync=True),
-    OpSpec("cvt", ("name", "dtype"), _MEM_TYPES + _FLOATS, 1, 1, "any"),
+    # cvt.rn.f32.u32 carries both a rounding mode and the source type, so the
+    # opcode needs two type slots. Every conversion in quant work — fp8/fp16 to
+    # f32, u32 to f32 — goes through this one row.
+    OpSpec("cvt", ("name", "modifier", "dtype", "srctype"),
+           _MEM_TYPES + _FLOATS + ("b16", "b32"), 1, 1, "any",
+           modifiers=("rn", "rz", "rnz", "rni", "rzi", "rmn", "rmz"),
+           srcs=_MEM_TYPES + _FLOATS + ("b16", "b32")),
     # integer arithmetic
     OpSpec("add", ("name", "dtype"), _MEM_TYPES, 1, 2, "same", sync=True),
     OpSpec("sub", ("name", "dtype"), _MEM_TYPES, 1, 2, "same", sync=True),
@@ -70,15 +84,15 @@ _SPECS: tuple[OpSpec, ...] = (
     OpSpec("max", ("name", "dtype"), _INT_ALL + _FLOATS, 1, 2, "same", sync=True),
     OpSpec("rem", ("name", "dtype"), _INT_ALL, 1, 2, "same", sync=True),
     OpSpec("div", ("name", "dtype"), _INT_ALL, 1, 2, "same", sync=True),
-    OpSpec("shl", ("name", "dtype"), _INT_ALL, 1, 2, "same", sync=True),
-    OpSpec("shr", ("name", "dtype"), _INT_ALL, 1, 2, "same", sync=True),
-    OpSpec("and", ("name", "dtype"), _MEM_TYPES, 1, 2, "same", sync=True),
-    OpSpec("or", ("name", "dtype"), _MEM_TYPES, 1, 2, "same", sync=True),
-    OpSpec("xor", ("name", "dtype"), _MEM_TYPES, 1, 2, "same", sync=True),
-    OpSpec("not", ("name", "dtype"), _MEM_TYPES + ("pred",), 1, 1, "same"),
-    OpSpec("popc", ("name", "dtype"), _INT_ALL, 1, 1, "same"),
-    OpSpec("clz", ("name", "dtype"), _INT_ALL, 1, 1, "same"),
-    OpSpec("brev", ("name", "dtype"), _INT_ALL, 1, 1, "same"),
+    OpSpec("shl", ("name", "dtype"), _BIT_OPS, 1, 2, "same", sync=True),
+    OpSpec("shr", ("name", "dtype"), _BIT_OPS, 1, 2, "same", sync=True),
+    OpSpec("and", ("name", "dtype"), _MEM_OR_BITS, 1, 2, "same", sync=True),
+    OpSpec("or", ("name", "dtype"), _MEM_OR_BITS, 1, 2, "same", sync=True),
+    OpSpec("xor", ("name", "dtype"), _MEM_OR_BITS, 1, 2, "same", sync=True),
+    OpSpec("not", ("name", "dtype"), _MEM_OR_BITS + ("pred",), 1, 1, "same"),
+    OpSpec("popc", ("name", "dtype"), _BIT_OPS, 1, 1, "same"),
+    OpSpec("clz", ("name", "dtype"), _BIT_OPS, 1, 1, "same"),
+    OpSpec("brev", ("name", "dtype"), _BIT_OPS, 1, 1, "same"),
     # 32-bit widening helpers — the backbone of 64-bit address arithmetic
     OpSpec("mul.wide", ("name", "dtype"), _INT32, 1, 2, _INT32, sync=True),
     OpSpec("mad.lo", ("name", "dtype"), _INT_ALL, 1, 3, "same", sync=True),
@@ -192,6 +206,7 @@ def digest() -> str:
             otypes_text,
             _join_optional(spec.spaces),
             _join_optional(spec.modifiers),
+            _join_optional(spec.srcs),
             "true" if spec.sync else "false",
         ]))
     return "\n".join(lines)

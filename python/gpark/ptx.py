@@ -144,6 +144,8 @@ def opcode(i: dict) -> str:
             out.append(f".v{i['vec']}" if i["vec"] else "")
         elif part == "dtype":
             out.append(f".{i['dtype']}" if i["dtype"] else "")
+        elif part == "srctype":
+            out.append(f".{i['srctype']}" if i["srctype"] else "")
     return "".join(out)
 
 

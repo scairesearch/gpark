@@ -260,7 +260,19 @@ defmodule Gpark.Validate do
         ctx
       end
 
-    check_operand_types(ctx, spec, instr, block, index)
+    ctx = check_operand_types(ctx, spec, instr, block, index)
+
+    if is_list(spec.srcs) and instr.srctype not in spec.srcs do
+      issue(
+        ctx,
+        :bad_source_type,
+        "#{instr.base} does not convert from #{inspect(instr.srctype)}",
+        block.label,
+        index
+      )
+    else
+      ctx
+    end
   end
 
   # The `otypes` column was documented in `Gpark.Ops` but never enforced, so the

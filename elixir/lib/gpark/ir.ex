@@ -181,6 +181,9 @@ defmodule Gpark.IR do
 
   `vec` widens a load or store to `.v2`/`.v4`, which is how gpark gets vectorised
   memory traffic without asking a compiler to do it.
+
+  `srctype` is the second type slot, for opcodes that name one — `cvt` reads a
+  `srctype` and writes a `dtype`, as in `cvt.rn.f32.u32`.
   """
   def instr(base, opts \\ []) do
     %{
@@ -189,6 +192,7 @@ defmodule Gpark.IR do
       modifier: Keyword.get(opts, :modifier),
       vec: Keyword.get(opts, :vec),
       dtype: Keyword.get(opts, :dtype),
+      srctype: Keyword.get(opts, :srctype),
       dest: Keyword.get(opts, :dest),
       ops: Keyword.get(opts, :ops, []),
       pred: Keyword.get(opts, :pred)

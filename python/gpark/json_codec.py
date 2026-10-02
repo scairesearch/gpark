@@ -119,6 +119,9 @@ def _from_instr(m: dict) -> dict:
         modifier=m["modifier"],
         vec=m["vec"],
         dtype=m["dtype"],
+        # .get, not []: a spec written before the srctype field existed must still
+        # decode. The Elixir decoder is lenient here for the same reason.
+        srctype=m.get("srctype"),
         dest=_from_operand(m["dest"]) if m["dest"] else None,
         ops=[_from_operand(o) for o in m["ops"] or []],
         pred=_from_operand(m["pred"]) if m["pred"] else None,

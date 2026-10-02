@@ -22,13 +22,7 @@ test-python: ## Python: compile check, tests (incl. the cross-impl. corpus check
 	cd $(PYTHON_DIR) && $(PYTHON) -m unittest discover -s tests -t . -v
 
 corpus: ## Regenerate corpus specs and goldens from the Elixir kernels
-	cd $(ELIXIR) && mix run -e '
-	  for m <- [Gpark.Kernels.VecAddF32, Gpark.Kernels.SaxpyF32, Gpark.Kernels.ReduceSumF32] do
-	    k = m.build()
-	    {:ok, _} = Gpark.Validate.check(k)
-	    File.write!("../corpus/specs/#{k.name}.json", Gpark.IR.JSON.encode!(k))
-	    File.write!("../corpus/golden/#{k.name}.ptx", Gpark.PTX.emit(k))
-	  end'
+	cd $(ELIXIR) && mix run regen_corpus.exs
 
 format: ## Format both implementations
 	cd $(ELIXIR) && mix format

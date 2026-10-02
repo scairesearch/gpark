@@ -1,0 +1,75 @@
+.version 8.7
+.target sm_80
+.address_size 64
+.visible .entry unpack_u4_f32(
+	.param .u64 in,
+	.param .u64 out,
+	.param .f32 scale,
+	.param .u32 n
+)
+{
+	.reg .pred %p1<2>;
+	.reg .u32 %r1<2>, %r4<3>;
+	.reg .u64 %rd1<4>;
+	.reg .f32 %f1<2>;
+$L__entry:
+	ld.param.u64 %rd1, [in];
+	ld.param.u64 %rd2, [out];
+	ld.param.f32 %f1, [scale];
+	ld.param.u32 %r1, [n];
+	mov.u32 %r2, %ctaid.x;
+	setp.ge.u32 %p1, %r2, %r1;
+	not.pred %p2, %p1;
+	mul.wide.u32 %rd3, %r2, 4;
+	ld.global.u32 %r4, [%rd1+%rd3];
+	mul.wide.u32 %rd4, %r2, 32;
+	cvt.rn.f32.u32 %f2, %r4;
+	mul.f32 %f2, %f1, %f2;
+	st.global.f32 [%rd2+%rd4], %f2;
+	mov.u32 %r5, 4;
+	shr.u32 %r6, %r4, %r5;
+	and.u32 %r6, %r6, 15;
+	cvt.rn.f32.u32 %f2, %r6;
+	mul.f32 %f2, %f1, %f2;
+	st.global.f32 [%rd2+%rd4], %f2;
+	mov.u32 %r5, 8;
+	shr.u32 %r6, %r4, %r5;
+	and.u32 %r6, %r6, 15;
+	cvt.rn.f32.u32 %f2, %r6;
+	mul.f32 %f2, %f1, %f2;
+	st.global.f32 [%rd2+%rd4], %f2;
+	mov.u32 %r5, 12;
+	shr.u32 %r6, %r4, %r5;
+	and.u32 %r6, %r6, 15;
+	cvt.rn.f32.u32 %f2, %r6;
+	mul.f32 %f2, %f1, %f2;
+	st.global.f32 [%rd2+%rd4], %f2;
+	mov.u32 %r5, 16;
+	shr.u32 %r6, %r4, %r5;
+	and.u32 %r6, %r6, 15;
+	cvt.rn.f32.u32 %f2, %r6;
+	mul.f32 %f2, %f1, %f2;
+	st.global.f32 [%rd2+%rd4], %f2;
+	mov.u32 %r5, 20;
+	shr.u32 %r6, %r4, %r5;
+	and.u32 %r6, %r6, 15;
+	cvt.rn.f32.u32 %f2, %r6;
+	mul.f32 %f2, %f1, %f2;
+	st.global.f32 [%rd2+%rd4], %f2;
+	mov.u32 %r5, 24;
+	shr.u32 %r6, %r4, %r5;
+	and.u32 %r6, %r6, 15;
+	cvt.rn.f32.u32 %f2, %r6;
+	mul.f32 %f2, %f1, %f2;
+	st.global.f32 [%rd2+%rd4], %f2;
+	mov.u32 %r5, 28;
+	shr.u32 %r6, %r4, %r5;
+	and.u32 %r6, %r6, 15;
+	cvt.rn.f32.u32 %f2, %r6;
+	mul.f32 %f2, %f1, %f2;
+	st.global.f32 [%rd2+%rd4], %f2;
+	add.u64 %rd4, %rd4, 4;
+	@%p2 bra $L__done;
+$L__done:
+	ret;
+}

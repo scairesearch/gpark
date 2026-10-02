@@ -1,0 +1,1440 @@
+{
+  "blocks": [
+    {
+      "instrs": [
+        {
+          "base": "ld",
+          "dest": [
+            "reg",
+            "u64",
+            1
+          ],
+          "dtype": "u64",
+          "modifier": null,
+          "ops": [
+            [
+              "param",
+              "in"
+            ]
+          ],
+          "pred": null,
+          "space": "param",
+          "srctype": null,
+          "vec": null
+        },
+        {
+          "base": "ld",
+          "dest": [
+            "reg",
+            "u64",
+            2
+          ],
+          "dtype": "u64",
+          "modifier": null,
+          "ops": [
+            [
+              "param",
+              "out"
+            ]
+          ],
+          "pred": null,
+          "space": "param",
+          "srctype": null,
+          "vec": null
+        },
+        {
+          "base": "ld",
+          "dest": [
+            "reg",
+            "f32",
+            1
+          ],
+          "dtype": "f32",
+          "modifier": null,
+          "ops": [
+            [
+              "param",
+              "scale"
+            ]
+          ],
+          "pred": null,
+          "space": "param",
+          "srctype": null,
+          "vec": null
+        },
+        {
+          "base": "ld",
+          "dest": [
+            "reg",
+            "u32",
+            1
+          ],
+          "dtype": "u32",
+          "modifier": null,
+          "ops": [
+            [
+              "param",
+              "n"
+            ]
+          ],
+          "pred": null,
+          "space": "param",
+          "srctype": null,
+          "vec": null
+        },
+        {
+          "base": "mov",
+          "dest": [
+            "reg",
+            "u32",
+            2
+          ],
+          "dtype": "u32",
+          "modifier": null,
+          "ops": [
+            [
+              "sreg",
+              "ctaid_x"
+            ]
+          ],
+          "pred": null,
+          "space": null,
+          "srctype": null,
+          "vec": null
+        },
+        {
+          "base": "setp",
+          "dest": [
+            "pred",
+            1
+          ],
+          "dtype": "u32",
+          "modifier": "ge",
+          "ops": [
+            [
+              "reg",
+              "u32",
+              2
+            ],
+            [
+              "reg",
+              "u32",
+              1
+            ]
+          ],
+          "pred": null,
+          "space": null,
+          "srctype": null,
+          "vec": null
+        },
+        {
+          "base": "not",
+          "dest": [
+            "pred",
+            2
+          ],
+          "dtype": "pred",
+          "modifier": null,
+          "ops": [
+            [
+              "pred",
+              1
+            ]
+          ],
+          "pred": null,
+          "space": null,
+          "srctype": null,
+          "vec": null
+        },
+        {
+          "base": "mul.wide",
+          "dest": [
+            "reg",
+            "u64",
+            3
+          ],
+          "dtype": "u32",
+          "modifier": null,
+          "ops": [
+            [
+              "reg",
+              "u32",
+              2
+            ],
+            [
+              "imm",
+              4
+            ]
+          ],
+          "pred": null,
+          "space": null,
+          "srctype": null,
+          "vec": null
+        },
+        {
+          "base": "ld",
+          "dest": [
+            "reg",
+            "u32",
+            4
+          ],
+          "dtype": "u32",
+          "modifier": null,
+          "ops": [
+            [
+              "addr",
+              [
+                "reg",
+                "u64",
+                1
+              ],
+              [
+                "reg",
+                "u64",
+                3
+              ],
+              null
+            ]
+          ],
+          "pred": null,
+          "space": "global",
+          "srctype": null,
+          "vec": null
+        },
+        {
+          "base": "mul.wide",
+          "dest": [
+            "reg",
+            "u64",
+            4
+          ],
+          "dtype": "u32",
+          "modifier": null,
+          "ops": [
+            [
+              "reg",
+              "u32",
+              2
+            ],
+            [
+              "imm",
+              32
+            ]
+          ],
+          "pred": null,
+          "space": null,
+          "srctype": null,
+          "vec": null
+        },
+        {
+          "base": "cvt",
+          "dest": [
+            "reg",
+            "f32",
+            2
+          ],
+          "dtype": "f32",
+          "modifier": "rn",
+          "ops": [
+            [
+              "reg",
+              "u32",
+              4
+            ]
+          ],
+          "pred": null,
+          "space": null,
+          "srctype": "u32",
+          "vec": null
+        },
+        {
+          "base": "mul",
+          "dest": [
+            "reg",
+            "f32",
+            2
+          ],
+          "dtype": "f32",
+          "modifier": null,
+          "ops": [
+            [
+              "reg",
+              "f32",
+              1
+            ],
+            [
+              "reg",
+              "f32",
+              2
+            ]
+          ],
+          "pred": null,
+          "space": null,
+          "srctype": null,
+          "vec": null
+        },
+        {
+          "base": "st",
+          "dest": null,
+          "dtype": "f32",
+          "modifier": null,
+          "ops": [
+            [
+              "addr",
+              [
+                "reg",
+                "u64",
+                2
+              ],
+              [
+                "reg",
+                "u64",
+                4
+              ],
+              null
+            ],
+            [
+              "reg",
+              "f32",
+              2
+            ]
+          ],
+          "pred": null,
+          "space": "global",
+          "srctype": null,
+          "vec": null
+        },
+        {
+          "base": "mov",
+          "dest": [
+            "reg",
+            "u32",
+            5
+          ],
+          "dtype": "u32",
+          "modifier": null,
+          "ops": [
+            [
+              "imm",
+              4
+            ]
+          ],
+          "pred": null,
+          "space": null,
+          "srctype": null,
+          "vec": null
+        },
+        {
+          "base": "shr",
+          "dest": [
+            "reg",
+            "u32",
+            6
+          ],
+          "dtype": "u32",
+          "modifier": null,
+          "ops": [
+            [
+              "reg",
+              "u32",
+              4
+            ],
+            [
+              "reg",
+              "u32",
+              5
+            ]
+          ],
+          "pred": null,
+          "space": null,
+          "srctype": null,
+          "vec": null
+        },
+        {
+          "base": "and",
+          "dest": [
+            "reg",
+            "u32",
+            6
+          ],
+          "dtype": "u32",
+          "modifier": null,
+          "ops": [
+            [
+              "reg",
+              "u32",
+              6
+            ],
+            [
+              "imm",
+              15
+            ]
+          ],
+          "pred": null,
+          "space": null,
+          "srctype": null,
+          "vec": null
+        },
+        {
+          "base": "cvt",
+          "dest": [
+            "reg",
+            "f32",
+            2
+          ],
+          "dtype": "f32",
+          "modifier": "rn",
+          "ops": [
+            [
+              "reg",
+              "u32",
+              6
+            ]
+          ],
+          "pred": null,
+          "space": null,
+          "srctype": "u32",
+          "vec": null
+        },
+        {
+          "base": "mul",
+          "dest": [
+            "reg",
+            "f32",
+            2
+          ],
+          "dtype": "f32",
+          "modifier": null,
+          "ops": [
+            [
+              "reg",
+              "f32",
+              1
+            ],
+            [
+              "reg",
+              "f32",
+              2
+            ]
+          ],
+          "pred": null,
+          "space": null,
+          "srctype": null,
+          "vec": null
+        },
+        {
+          "base": "st",
+          "dest": null,
+          "dtype": "f32",
+          "modifier": null,
+          "ops": [
+            [
+              "addr",
+              [
+                "reg",
+                "u64",
+                2
+              ],
+              [
+                "reg",
+                "u64",
+                4
+              ],
+              null
+            ],
+            [
+              "reg",
+              "f32",
+              2
+            ]
+          ],
+          "pred": null,
+          "space": "global",
+          "srctype": null,
+          "vec": null
+        },
+        {
+          "base": "mov",
+          "dest": [
+            "reg",
+            "u32",
+            5
+          ],
+          "dtype": "u32",
+          "modifier": null,
+          "ops": [
+            [
+              "imm",
+              8
+            ]
+          ],
+          "pred": null,
+          "space": null,
+          "srctype": null,
+          "vec": null
+        },
+        {
+          "base": "shr",
+          "dest": [
+            "reg",
+            "u32",
+            6
+          ],
+          "dtype": "u32",
+          "modifier": null,
+          "ops": [
+            [
+              "reg",
+              "u32",
+              4
+            ],
+            [
+              "reg",
+              "u32",
+              5
+            ]
+          ],
+          "pred": null,
+          "space": null,
+          "srctype": null,
+          "vec": null
+        },
+        {
+          "base": "and",
+          "dest": [
+            "reg",
+            "u32",
+            6
+          ],
+          "dtype": "u32",
+          "modifier": null,
+          "ops": [
+            [
+              "reg",
+              "u32",
+              6
+            ],
+            [
+              "imm",
+              15
+            ]
+          ],
+          "pred": null,
+          "space": null,
+          "srctype": null,
+          "vec": null
+        },
+        {
+          "base": "cvt",
+          "dest": [
+            "reg",
+            "f32",
+            2
+          ],
+          "dtype": "f32",
+          "modifier": "rn",
+          "ops": [
+            [
+              "reg",
+              "u32",
+              6
+            ]
+          ],
+          "pred": null,
+          "space": null,
+          "srctype": "u32",
+          "vec": null
+        },
+        {
+          "base": "mul",
+          "dest": [
+            "reg",
+            "f32",
+            2
+          ],
+          "dtype": "f32",
+          "modifier": null,
+          "ops": [
+            [
+              "reg",
+              "f32",
+              1
+            ],
+            [
+              "reg",
+              "f32",
+              2
+            ]
+          ],
+          "pred": null,
+          "space": null,
+          "srctype": null,
+          "vec": null
+        },
+        {
+          "base": "st",
+          "dest": null,
+          "dtype": "f32",
+          "modifier": null,
+          "ops": [
+            [
+              "addr",
+              [
+                "reg",
+                "u64",
+                2
+              ],
+              [
+                "reg",
+                "u64",
+                4
+              ],
+              null
+            ],
+            [
+              "reg",
+              "f32",
+              2
+            ]
+          ],
+          "pred": null,
+          "space": "global",
+          "srctype": null,
+          "vec": null
+        },
+        {
+          "base": "mov",
+          "dest": [
+            "reg",
+            "u32",
+            5
+          ],
+          "dtype": "u32",
+          "modifier": null,
+          "ops": [
+            [
+              "imm",
+              12
+            ]
+          ],
+          "pred": null,
+          "space": null,
+          "srctype": null,
+          "vec": null
+        },
+        {
+          "base": "shr",
+          "dest": [
+            "reg",
+            "u32",
+            6
+          ],
+          "dtype": "u32",
+          "modifier": null,
+          "ops": [
+            [
+              "reg",
+              "u32",
+              4
+            ],
+            [
+              "reg",
+              "u32",
+              5
+            ]
+          ],
+          "pred": null,
+          "space": null,
+          "srctype": null,
+          "vec": null
+        },
+        {
+          "base": "and",
+          "dest": [
+            "reg",
+            "u32",
+            6
+          ],
+          "dtype": "u32",
+          "modifier": null,
+          "ops": [
+            [
+              "reg",
+              "u32",
+              6
+            ],
+            [
+              "imm",
+              15
+            ]
+          ],
+          "pred": null,
+          "space": null,
+          "srctype": null,
+          "vec": null
+        },
+        {
+          "base": "cvt",
+          "dest": [
+            "reg",
+            "f32",
+            2
+          ],
+          "dtype": "f32",
+          "modifier": "rn",
+          "ops": [
+            [
+              "reg",
+              "u32",
+              6
+            ]
+          ],
+          "pred": null,
+          "space": null,
+          "srctype": "u32",
+          "vec": null
+        },
+        {
+          "base": "mul",
+          "dest": [
+            "reg",
+            "f32",
+            2
+          ],
+          "dtype": "f32",
+          "modifier": null,
+          "ops": [
+            [
+              "reg",
+              "f32",
+              1
+            ],
+            [
+              "reg",
+              "f32",
+              2
+            ]
+          ],
+          "pred": null,
+          "space": null,
+          "srctype": null,
+          "vec": null
+        },
+        {
+          "base": "st",
+          "dest": null,
+          "dtype": "f32",
+          "modifier": null,
+          "ops": [
+            [
+              "addr",
+              [
+                "reg",
+                "u64",
+                2
+              ],
+              [
+                "reg",
+                "u64",
+                4
+              ],
+              null
+            ],
+            [
+              "reg",
+              "f32",
+              2
+            ]
+          ],
+          "pred": null,
+          "space": "global",
+          "srctype": null,
+          "vec": null
+        },
+        {
+          "base": "mov",
+          "dest": [
+            "reg",
+            "u32",
+            5
+          ],
+          "dtype": "u32",
+          "modifier": null,
+          "ops": [
+            [
+              "imm",
+              16
+            ]
+          ],
+          "pred": null,
+          "space": null,
+          "srctype": null,
+          "vec": null
+        },
+        {
+          "base": "shr",
+          "dest": [
+            "reg",
+            "u32",
+            6
+          ],
+          "dtype": "u32",
+          "modifier": null,
+          "ops": [
+            [
+              "reg",
+              "u32",
+              4
+            ],
+            [
+              "reg",
+              "u32",
+              5
+            ]
+          ],
+          "pred": null,
+          "space": null,
+          "srctype": null,
+          "vec": null
+        },
+        {
+          "base": "and",
+          "dest": [
+            "reg",
+            "u32",
+            6
+          ],
+          "dtype": "u32",
+          "modifier": null,
+          "ops": [
+            [
+              "reg",
+              "u32",
+              6
+            ],
+            [
+              "imm",
+              15
+            ]
+          ],
+          "pred": null,
+          "space": null,
+          "srctype": null,
+          "vec": null
+        },
+        {
+          "base": "cvt",
+          "dest": [
+            "reg",
+            "f32",
+            2
+          ],
+          "dtype": "f32",
+          "modifier": "rn",
+          "ops": [
+            [
+              "reg",
+              "u32",
+              6
+            ]
+          ],
+          "pred": null,
+          "space": null,
+          "srctype": "u32",
+          "vec": null
+        },
+        {
+          "base": "mul",
+          "dest": [
+            "reg",
+            "f32",
+            2
+          ],
+          "dtype": "f32",
+          "modifier": null,
+          "ops": [
+            [
+              "reg",
+              "f32",
+              1
+            ],
+            [
+              "reg",
+              "f32",
+              2
+            ]
+          ],
+          "pred": null,
+          "space": null,
+          "srctype": null,
+          "vec": null
+        },
+        {
+          "base": "st",
+          "dest": null,
+          "dtype": "f32",
+          "modifier": null,
+          "ops": [
+            [
+              "addr",
+              [
+                "reg",
+                "u64",
+                2
+              ],
+              [
+                "reg",
+                "u64",
+                4
+              ],
+              null
+            ],
+            [
+              "reg",
+              "f32",
+              2
+            ]
+          ],
+          "pred": null,
+          "space": "global",
+          "srctype": null,
+          "vec": null
+        },
+        {
+          "base": "mov",
+          "dest": [
+            "reg",
+            "u32",
+            5
+          ],
+          "dtype": "u32",
+          "modifier": null,
+          "ops": [
+            [
+              "imm",
+              20
+            ]
+          ],
+          "pred": null,
+          "space": null,
+          "srctype": null,
+          "vec": null
+        },
+        {
+          "base": "shr",
+          "dest": [
+            "reg",
+            "u32",
+            6
+          ],
+          "dtype": "u32",
+          "modifier": null,
+          "ops": [
+            [
+              "reg",
+              "u32",
+              4
+            ],
+            [
+              "reg",
+              "u32",
+              5
+            ]
+          ],
+          "pred": null,
+          "space": null,
+          "srctype": null,
+          "vec": null
+        },
+        {
+          "base": "and",
+          "dest": [
+            "reg",
+            "u32",
+            6
+          ],
+          "dtype": "u32",
+          "modifier": null,
+          "ops": [
+            [
+              "reg",
+              "u32",
+              6
+            ],
+            [
+              "imm",
+              15
+            ]
+          ],
+          "pred": null,
+          "space": null,
+          "srctype": null,
+          "vec": null
+        },
+        {
+          "base": "cvt",
+          "dest": [
+            "reg",
+            "f32",
+            2
+          ],
+          "dtype": "f32",
+          "modifier": "rn",
+          "ops": [
+            [
+              "reg",
+              "u32",
+              6
+            ]
+          ],
+          "pred": null,
+          "space": null,
+          "srctype": "u32",
+          "vec": null
+        },
+        {
+          "base": "mul",
+          "dest": [
+            "reg",
+            "f32",
+            2
+          ],
+          "dtype": "f32",
+          "modifier": null,
+          "ops": [
+            [
+              "reg",
+              "f32",
+              1
+            ],
+            [
+              "reg",
+              "f32",
+              2
+            ]
+          ],
+          "pred": null,
+          "space": null,
+          "srctype": null,
+          "vec": null
+        },
+        {
+          "base": "st",
+          "dest": null,
+          "dtype": "f32",
+          "modifier": null,
+          "ops": [
+            [
+              "addr",
+              [
+                "reg",
+                "u64",
+                2
+              ],
+              [
+                "reg",
+                "u64",
+                4
+              ],
+              null
+            ],
+            [
+              "reg",
+              "f32",
+              2
+            ]
+          ],
+          "pred": null,
+          "space": "global",
+          "srctype": null,
+          "vec": null
+        },
+        {
+          "base": "mov",
+          "dest": [
+            "reg",
+            "u32",
+            5
+          ],
+          "dtype": "u32",
+          "modifier": null,
+          "ops": [
+            [
+              "imm",
+              24
+            ]
+          ],
+          "pred": null,
+          "space": null,
+          "srctype": null,
+          "vec": null
+        },
+        {
+          "base": "shr",
+          "dest": [
+            "reg",
+            "u32",
+            6
+          ],
+          "dtype": "u32",
+          "modifier": null,
+          "ops": [
+            [
+              "reg",
+              "u32",
+              4
+            ],
+            [
+              "reg",
+              "u32",
+              5
+            ]
+          ],
+          "pred": null,
+          "space": null,
+          "srctype": null,
+          "vec": null
+        },
+        {
+          "base": "and",
+          "dest": [
+            "reg",
+            "u32",
+            6
+          ],
+          "dtype": "u32",
+          "modifier": null,
+          "ops": [
+            [
+              "reg",
+              "u32",
+              6
+            ],
+            [
+              "imm",
+              15
+            ]
+          ],
+          "pred": null,
+          "space": null,
+          "srctype": null,
+          "vec": null
+        },
+        {
+          "base": "cvt",
+          "dest": [
+            "reg",
+            "f32",
+            2
+          ],
+          "dtype": "f32",
+          "modifier": "rn",
+          "ops": [
+            [
+              "reg",
+              "u32",
+              6
+            ]
+          ],
+          "pred": null,
+          "space": null,
+          "srctype": "u32",
+          "vec": null
+        },
+        {
+          "base": "mul",
+          "dest": [
+            "reg",
+            "f32",
+            2
+          ],
+          "dtype": "f32",
+          "modifier": null,
+          "ops": [
+            [
+              "reg",
+              "f32",
+              1
+            ],
+            [
+              "reg",
+              "f32",
+              2
+            ]
+          ],
+          "pred": null,
+          "space": null,
+          "srctype": null,
+          "vec": null
+        },
+        {
+          "base": "st",
+          "dest": null,
+          "dtype": "f32",
+          "modifier": null,
+          "ops": [
+            [
+              "addr",
+              [
+                "reg",
+                "u64",
+                2
+              ],
+              [
+                "reg",
+                "u64",
+                4
+              ],
+              null
+            ],
+            [
+              "reg",
+              "f32",
+              2
+            ]
+          ],
+          "pred": null,
+          "space": "global",
+          "srctype": null,
+          "vec": null
+        },
+        {
+          "base": "mov",
+          "dest": [
+            "reg",
+            "u32",
+            5
+          ],
+          "dtype": "u32",
+          "modifier": null,
+          "ops": [
+            [
+              "imm",
+              28
+            ]
+          ],
+          "pred": null,
+          "space": null,
+          "srctype": null,
+          "vec": null
+        },
+        {
+          "base": "shr",
+          "dest": [
+            "reg",
+            "u32",
+            6
+          ],
+          "dtype": "u32",
+          "modifier": null,
+          "ops": [
+            [
+              "reg",
+              "u32",
+              4
+            ],
+            [
+              "reg",
+              "u32",
+              5
+            ]
+          ],
+          "pred": null,
+          "space": null,
+          "srctype": null,
+          "vec": null
+        },
+        {
+          "base": "and",
+          "dest": [
+            "reg",
+            "u32",
+            6
+          ],
+          "dtype": "u32",
+          "modifier": null,
+          "ops": [
+            [
+              "reg",
+              "u32",
+              6
+            ],
+            [
+              "imm",
+              15
+            ]
+          ],
+          "pred": null,
+          "space": null,
+          "srctype": null,
+          "vec": null
+        },
+        {
+          "base": "cvt",
+          "dest": [
+            "reg",
+            "f32",
+            2
+          ],
+          "dtype": "f32",
+          "modifier": "rn",
+          "ops": [
+            [
+              "reg",
+              "u32",
+              6
+            ]
+          ],
+          "pred": null,
+          "space": null,
+          "srctype": "u32",
+          "vec": null
+        },
+        {
+          "base": "mul",
+          "dest": [
+            "reg",
+            "f32",
+            2
+          ],
+          "dtype": "f32",
+          "modifier": null,
+          "ops": [
+            [
+              "reg",
+              "f32",
+              1
+            ],
+            [
+              "reg",
+              "f32",
+              2
+            ]
+          ],
+          "pred": null,
+          "space": null,
+          "srctype": null,
+          "vec": null
+        },
+        {
+          "base": "st",
+          "dest": null,
+          "dtype": "f32",
+          "modifier": null,
+          "ops": [
+            [
+              "addr",
+              [
+                "reg",
+                "u64",
+                2
+              ],
+              [
+                "reg",
+                "u64",
+                4
+              ],
+              null
+            ],
+            [
+              "reg",
+              "f32",
+              2
+            ]
+          ],
+          "pred": null,
+          "space": "global",
+          "srctype": null,
+          "vec": null
+        },
+        {
+          "base": "add",
+          "dest": [
+            "reg",
+            "u64",
+            4
+          ],
+          "dtype": "u64",
+          "modifier": null,
+          "ops": [
+            [
+              "reg",
+              "u64",
+              4
+            ],
+            [
+              "imm",
+              4
+            ]
+          ],
+          "pred": null,
+          "space": null,
+          "srctype": null,
+          "vec": null
+        }
+      ],
+      "label": "entry",
+      "term": {
+        "base": "bra",
+        "dest": null,
+        "dtype": null,
+        "modifier": null,
+        "ops": [
+          [
+            "label",
+            "done"
+          ]
+        ],
+        "pred": [
+          "pred",
+          2
+        ],
+        "space": null,
+        "srctype": null,
+        "vec": null
+      }
+    },
+    {
+      "instrs": [],
+      "label": "done",
+      "term": {
+        "base": "ret",
+        "dest": null,
+        "dtype": null,
+        "modifier": null,
+        "ops": [],
+        "pred": null,
+        "space": null,
+        "srctype": null,
+        "vec": null
+      }
+    }
+  ],
+  "maxntid": null,
+  "name": "unpack_u4_f32",
+  "params": [
+    {
+      "name": "in",
+      "space": "global",
+      "type": "u64"
+    },
+    {
+      "name": "out",
+      "space": "global",
+      "type": "u64"
+    },
+    {
+      "name": "scale",
+      "space": "global",
+      "type": "f32"
+    },
+    {
+      "name": "n",
+      "space": "global",
+      "type": "u32"
+    }
+  ],
+  "ptx_version": "8.7",
+  "shared": 0,
+  "target": "sm_80"
+}

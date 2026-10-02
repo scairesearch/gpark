@@ -32,7 +32,14 @@ defmodule Gpark.Ops do
   @int64 [:s64, :u64]
   @int_all @int32 ++ @int64
   @floats [:f32, :f64]
+
+  # PTX performs bitwise and shift arithmetic on `.b16`/`.b32` as well as on the
+  # signed and unsigned integer types. Without these, unpacking a 4-bit weight
+  # is impossible: masking a `.b32` word is not expressible in the int types.
+  @bints [:b16, :b32, :b64]
+  @bit_ops @int_all ++ @bints
   @mem_types @int_all ++ @floats ++ [:b64]
+  @mem_or_bits @mem_types ++ [:b16, :b32]
 
   # --- the table ------------------------------------------------------------
 
@@ -40,7 +47,12 @@ defmodule Gpark.Ops do
   @specs [
     # data movement / conversion
     {"mov", [:name, :dtype], @mem_types ++ [:pred], 1, 1, :same, [sync: true]},
-    {"cvt", [:name, :dtype], @mem_types ++ @floats, 1, 1, :any, []},
+    # `cvt.rn.f32.u32` carries both a rounding mode and the source type, so the
+    # opcode needs two type slots. Every conversion in quant work — fp8/fp16 to
+    # f32, u32 to f32 — goes through this one row.
+    {"cvt", [:name, :modifier, :dtype, :srctype], @mem_types ++ @floats ++ [:b16, :b32], 1, 1,
+     :any,
+     [modifiers: ~w(rn rz rnz rni rzi rmn rmz), srcs: @mem_types ++ @floats ++ [:b16, :b32]]},
 
     # integer arithmetic
     {"add", [:name, :dtype], @mem_types, 1, 2, :same, [sync: true]},
@@ -53,15 +65,15 @@ defmodule Gpark.Ops do
     {"max", [:name, :dtype], @int_all ++ @floats, 1, 2, :same, [sync: true]},
     {"rem", [:name, :dtype], @int_all, 1, 2, :same, [sync: true]},
     {"div", [:name, :dtype], @int_all, 1, 2, :same, [sync: true]},
-    {"shl", [:name, :dtype], @int_all, 1, 2, :same, [sync: true]},
-    {"shr", [:name, :dtype], @int_all, 1, 2, :same, [sync: true]},
-    {"and", [:name, :dtype], @mem_types, 1, 2, :same, [sync: true]},
-    {"or", [:name, :dtype], @mem_types, 1, 2, :same, [sync: true]},
-    {"xor", [:name, :dtype], @mem_types, 1, 2, :same, [sync: true]},
-    {"not", [:name, :dtype], @mem_types ++ [:pred], 1, 1, :same, []},
-    {"popc", [:name, :dtype], @int_all, 1, 1, :same, []},
-    {"clz", [:name, :dtype], @int_all, 1, 1, :same, []},
-    {"brev", [:name, :dtype], @int_all, 1, 1, :same, []},
+    {"shl", [:name, :dtype], @bit_ops, 1, 2, :same, [sync: true]},
+    {"shr", [:name, :dtype], @bit_ops, 1, 2, :same, [sync: true]},
+    {"and", [:name, :dtype], @mem_or_bits, 1, 2, :same, [sync: true]},
+    {"or", [:name, :dtype], @mem_or_bits, 1, 2, :same, [sync: true]},
+    {"xor", [:name, :dtype], @mem_or_bits, 1, 2, :same, [sync: true]},
+    {"not", [:name, :dtype], @mem_or_bits ++ [:pred], 1, 1, :same, []},
+    {"popc", [:name, :dtype], @bit_ops, 1, 1, :same, []},
+    {"clz", [:name, :dtype], @bit_ops, 1, 1, :same, []},
+    {"brev", [:name, :dtype], @bit_ops, 1, 1, :same, []},
 
     # 32-bit widening helpers — the backbone of 64-bit address arithmetic.
     {"mul.wide", [:name, :dtype], [:u32, :s32], 1, 2, [:u32, :s32], [sync: true]},
@@ -127,6 +139,7 @@ defmodule Gpark.Ops do
           otypes: atom() | [atom()],
           spaces: [atom()] | nil,
           modifiers: [String.t() | nil] | nil,
+          srcs: [atom()] | nil,
           sync: boolean()
         }
 
@@ -141,6 +154,7 @@ defmodule Gpark.Ops do
         otypes: otypes,
         spaces: nil,
         modifiers: nil,
+        srcs: nil,
         sync: false
       }
 
