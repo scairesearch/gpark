@@ -50,7 +50,7 @@ that a scheduling subtlety bit.
 
 `unpack_u4_f32` is the reason the type system splits *containers* (`b1`…`b64`) from
 *element formats* (`u4`, `s4`, `f16`, `bf16`, `e4m3`, …). PTX has no 4-bit float
-arithmetic, so a `u4` value lives in a `.b32` register and every operation on it is a
+arithmetic, so a 4-bit value lives in a `.b32` register and every operation on it is a
 32-bit op plus a mask. Anything that treats it as occupying 4 bits is wrong about
 occupancy, registers, and memory traffic.
 
