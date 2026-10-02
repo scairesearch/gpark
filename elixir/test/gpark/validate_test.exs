@@ -22,7 +22,12 @@ defmodule Gpark.ValidateTest do
     end
 
     test "rejects a type the opcode does not support" do
-      k = kernel_with([IR.instr("rsqrt", dtype: :f64, dest: IR.reg(:f64, 1), ops: [IR.immf(:f64, 1.0)])], IR.instr("ret"))
+      k =
+        kernel_with(
+          [IR.instr("rsqrt", dtype: :f64, dest: IR.reg(:f64, 1), ops: [IR.immf(:f64, 1.0)])],
+          IR.instr("ret")
+        )
+
       assert :bad_type in issues_for(k)
     end
 
@@ -39,15 +44,26 @@ defmodule Gpark.ValidateTest do
 
   describe "arity" do
     test "rejects the wrong operand count" do
-      k = kernel_with([IR.instr("add", dtype: :u32, dest: IR.reg(:u32, 1), ops: [IR.imm(1)])], IR.instr("ret"))
+      k =
+        kernel_with(
+          [IR.instr("add", dtype: :u32, dest: IR.reg(:u32, 1), ops: [IR.imm(1)])],
+          IR.instr("ret")
+        )
+
       assert :operand_arity in issues_for(k)
     end
 
     test "rejects a destination on a store" do
       k =
         kernel_with(
-          [IR.instr("st", dtype: :u32, space: :global, dest: IR.reg(:u32, 1),
-            ops: [IR.addr(IR.param(:x)), IR.imm(0)])],
+          [
+            IR.instr("st",
+              dtype: :u32,
+              space: :global,
+              dest: IR.reg(:u32, 1),
+              ops: [IR.addr(IR.param(:x)), IR.imm(0)]
+            )
+          ],
           IR.instr("ret")
         )
 
@@ -62,7 +78,19 @@ defmodule Gpark.ValidateTest do
     end
 
     test "rejects a parameter that is not declared" do
-      k = kernel_with([IR.instr("ld", dtype: :u64, space: :param, dest: IR.reg(:u64, 1), ops: [IR.param(:nope)])], IR.instr("ret"))
+      k =
+        kernel_with(
+          [
+            IR.instr("ld",
+              dtype: :u64,
+              space: :param,
+              dest: IR.reg(:u64, 1),
+              ops: [IR.param(:nope)]
+            )
+          ],
+          IR.instr("ret")
+        )
+
       assert :unknown_param in issues_for(k)
     end
   end
@@ -90,8 +118,9 @@ defmodule Gpark.ValidateTest do
 
   describe "initialisation" do
     test "rejects reading a register that was never written" do
-      instrs = [IR.instr("add", dtype: :u32, dest: IR.reg(:u32, 1),
-        ops: [IR.reg(:u32, 9), IR.imm(1)])]
+      instrs = [
+        IR.instr("add", dtype: :u32, dest: IR.reg(:u32, 1), ops: [IR.reg(:u32, 9), IR.imm(1)])
+      ]
 
       assert :uninitialised_register in issues_for(kernel_with(instrs, IR.instr("ret")))
     end
@@ -107,11 +136,16 @@ defmodule Gpark.ValidateTest do
 
     test "writes in an earlier block count as initialising" do
       blocks = [
-        IR.block(:entry, [IR.instr("mov", dtype: :u32, dest: IR.reg(:u32, 1), ops: [IR.imm(1)])],
-          IR.instr("bra", ops: [IR.label(:second)])),
-        IR.block(:second, [IR.instr("ret")],
-          IR.instr("add", dtype: :u32, dest: IR.reg(:u32, 2),
-            ops: [IR.reg(:u32, 1), IR.imm(1)]))
+        IR.block(
+          :entry,
+          [IR.instr("mov", dtype: :u32, dest: IR.reg(:u32, 1), ops: [IR.imm(1)])],
+          IR.instr("bra", ops: [IR.label(:second)])
+        ),
+        IR.block(
+          :second,
+          [IR.instr("ret")],
+          IR.instr("add", dtype: :u32, dest: IR.reg(:u32, 2), ops: [IR.reg(:u32, 1), IR.imm(1)])
+        )
       ]
 
       assert issues_for(IR.kernel(:t, params: [], blocks: blocks)) == []
@@ -130,11 +164,13 @@ defmodule Gpark.ValidateTest do
 
     test "rejects duplicate block labels" do
       k =
-        IR.kernel(:t, params: [],
+        IR.kernel(:t,
+          params: [],
           blocks: [
             IR.block(:entry, [], IR.instr("bra", ops: [IR.label(:entry)])),
             IR.block(:entry, [], IR.instr("ret"))
-          ])
+          ]
+        )
 
       assert :duplicate_block in issues_for(k)
     end

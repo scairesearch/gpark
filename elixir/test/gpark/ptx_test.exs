@@ -3,6 +3,8 @@ defmodule Gpark.PTXTest do
 
   alias Gpark.IR
   alias Gpark.PTX
+  alias Gpark.Validate
+  alias Gpark.IR.JSON
 
   describe "opcode rendering" do
     test "renders dotted parts in PTX order" do
@@ -88,10 +90,52 @@ defmodule Gpark.PTXTest do
     end
   end
 
-  describe "the corpus golden" do
-    test "matches the checked-in PTX byte for byte" do
-      expected = File.read!(Path.expand("../../../corpus/golden/vec_add_f32.ptx", __DIR__))
-      assert Gpark.Kernels.VecAddF32.build() |> PTX.emit() == expected
+  describe "the corpus" do
+    test "every spec round-trips and reproduces its golden byte for byte" do
+      # This is the contract the Python implementation has to satisfy: not
+      # "close enough", the same bytes. A backend that formats differently is a
+      # backend you cannot diff against a real nvcc build.
+      for path <- specs() do
+        name = Path.basename(path, ".json")
+        kernel = path |> File.read!() |> JSON.decode!()
+
+        # decode!/1 returns the kernel itself; only check/1 returns a tuple.
+        assert ^kernel = JSON.decode!(JSON.encode!(kernel)),
+               "#{name}: spec is not a fixed point of encode/decode"
+
+        assert {:ok, _} = Validate.check(kernel), "#{name}: does not validate"
+
+        golden = File.read!(Path.join(Gpark.Golden.dir(), "#{name}.ptx"))
+        assert PTX.emit(kernel) == golden, "#{name}: PTX differs from golden"
+      end
+    end
+
+    test "every golden has a spec and every spec has a golden" do
+      names = Enum.map(specs(), &Path.basename(&1, ".json")) |> Enum.sort()
+      goldens = Gpark.Golden.contents() |> Enum.map(&Path.basename(&1, ".ptx")) |> Enum.sort()
+      assert names == goldens
+    end
+
+    test "covers the intended kernel families" do
+      # Guards against a corpus that quietly stops testing anything: these three
+      # force scalar indexing, a fused arithmetic op, and warp shuffles.
+      assert kernel_names() == ["reduce_sum_f32", "saxpy_f32", "vec_add_f32"]
+
+      # Scalar indexing, a fused arithmetic op, and warp shuffles are the three
+      # things a naive emitter gets wrong; all three are now pinned by a golden.
+      assert File.read!(Path.join(Gpark.Golden.dir(), "vec_add_f32.ptx")) =~ "mul.wide.u32"
+      assert File.read!(Path.join(Gpark.Golden.dir(), "saxpy_f32.ptx")) =~ "fma.rn.f32"
+
+      assert File.read!(Path.join(Gpark.Golden.dir(), "reduce_sum_f32.ptx")) =~
+               "shfl.sync.bfly.f32"
+    end
+
+    defp kernel_names, do: specs() |> Enum.map(&Path.basename(&1, ".json"))
+
+    defp specs do
+      Path.join(Gpark.Golden.corpus_dir(), "specs/*.json")
+      |> Path.wildcard()
+      |> Enum.sort()
     end
   end
 end

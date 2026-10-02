@@ -4,9 +4,17 @@ ExUnit.start()
 # PTX text for the same kernel. Byte-identical output is the contract that keeps
 # the Elixir and Python ports honest as they diverge.
 defmodule Gpark.Golden do
-  @corpus Path.expand("../corpus", __DIR__)
+  @corpus Path.expand("../../corpus", __DIR__)
 
   def corpus_dir, do: @corpus
+
+  @doc "The `corpus/golden` directory."
+  def dir, do: Path.join(@corpus, "golden")
+
+  @doc "Paths to all golden `.ptx` files."
+  def contents do
+    dir() |> Path.join("*.ptx") |> Path.wildcard() |> Enum.sort()
+  end
 
   @doc "All golden `.ptx` files, as `{kernel_name, ptx_text}` pairs."
   def all do

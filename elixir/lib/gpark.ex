@@ -1,15 +1,8 @@
-"""GPU kernel package for Elixir and Python.
-
-gpark emits PTX directly, in the same spirit as writing CUDA C but from a
-language that already has the parts you need: pattern matching, exhaustive
-case, and a real compiler. It also aims to replace the two libraries that
-currently dominate this space — Triton for kernel authoring and CuPy for array
-kernels — but by keeping a path down to raw PTX rather than hiding one.
-
-Status: see ``docs/ROADMAP.md``. The Elixir backend compiles, validates and
-emits PTX; no kernel has a measured speedup yet, because no GPU has been
-attached to the project.
-"""
+# gpark — hand-written PTX kernels from Elixir and Python.
+#
+# This file is intentionally almost empty: the implementation lives in
+# `lib/gpark/`. See docs/ROADMAP.md for status and docs/ARCHITECTURE.md
+# for the full stack.
 
 defmodule Gpark do
   @moduledoc """

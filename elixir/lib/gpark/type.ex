@@ -95,11 +95,22 @@ defmodule Gpark.Type do
   @sub_byte %{s2: 2, u2: 2, s4: 4, u4: 4}
 
   # The native type a sub-byte element widens to before arithmetic.
-@widen %{
-    s2: :s16, u2: :u16, s4: :s16, u4: :u16,
-    e2m1: :f32, e4m3: :f32, e5m2: :f32,
-    e2m3: :f32, e3m2: :f32, e8m0: :f32,
-    bf16: :f32, f16: :f32, b1: :u32, b2: :u32, b4: :u32
+  @widen %{
+    s2: :s16,
+    u2: :u16,
+    s4: :s16,
+    u4: :u16,
+    e2m1: :f32,
+    e4m3: :f32,
+    e5m2: :f32,
+    e2m3: :f32,
+    e3m2: :f32,
+    e8m0: :f32,
+    bf16: :f32,
+    f16: :f32,
+    b1: :u32,
+    b2: :u32,
+    b4: :u32
   }
 
   @doc "All natively-supported PTX types, sorted."
@@ -165,7 +176,8 @@ defmodule Gpark.Type do
   end
 
   @doc "Build a packed type."
-  def packed(container, elem, count) when is_atom(container) and is_atom(elem) and is_integer(count) do
+  def packed(container, elem, count)
+      when is_atom(container) and is_atom(elem) and is_integer(count) do
     %Packed{container: container, elem: elem, count: count}
   end
 
@@ -225,6 +237,6 @@ defmodule Gpark.Type do
 
   @doc "Every type gpark knows about, for exhaustive tests and golden generation."
   def all do
-    native_names() ++ @sub_byte |> Map.keys() |> Enum.sort()
+    Enum.sort(native_names() ++ Map.keys(@sub_byte))
   end
 end

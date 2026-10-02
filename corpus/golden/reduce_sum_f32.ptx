@@ -1,0 +1,40 @@
+.version 8.7
+.target sm_80
+.address_size 64
+.visible .entry reduce_sum_f32(
+	.param .u64 in,
+	.param .u64 out,
+	.param .u32 n
+)
+{
+	.reg .pred %p1<2>;
+	.reg .u32 %r1<4>;
+	.reg .u64 %rd1<2>;
+	.reg .f32 %f1<2>;
+$L__entry:
+	ld.param.u64 %rd1, [in];
+	ld.param.u64 %rd2, [out];
+	ld.param.u32 %r1, [n];
+	mov.u32 %r2, %laneid;
+	sub.u32 %r3, %r1, 1;
+	min.u32 %r2, %r2, %r3;
+	shl.u32 %r4, %r2, 2;
+	ld.global.f32 %f1, [%rd1+%r4];
+	shfl.sync.bfly.f32 %f2, %f1, 16, 32;
+	add.f32 %f1, %f1, %f2;
+	shfl.sync.bfly.f32 %f2, %f1, 8, 32;
+	add.f32 %f1, %f1, %f2;
+	shfl.sync.bfly.f32 %f2, %f1, 4, 32;
+	add.f32 %f1, %f1, %f2;
+	shfl.sync.bfly.f32 %f2, %f1, 2, 32;
+	add.f32 %f1, %f1, %f2;
+	shfl.sync.bfly.f32 %f2, %f1, 1, 32;
+	add.f32 %f1, %f1, %f2;
+	setp.ne.u32 %p1, %r2, 0;
+	not.pred %p2, %p1;
+	@%p2 bra $L__write_out;
+	ret;
+$L__write_out:
+	st.global.f32 [%rd2], %f1;
+	ret;
+}

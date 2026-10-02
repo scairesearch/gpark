@@ -51,8 +51,12 @@ defmodule Gpark.PTX do
 
   defp header(kernel) do
     [
-      ".version ", to_string(kernel.ptx_version), "\n",
-      ".target ", to_string(kernel.target), "\n",
+      ".version ",
+      to_string(kernel.ptx_version),
+      "\n",
+      ".target ",
+      to_string(kernel.target),
+      "\n",
       ".address_size 64\n"
     ]
   end
@@ -63,7 +67,9 @@ defmodule Gpark.PTX do
 
   defp signature(%{name: name, params: params}) do
     [
-      ".visible .entry ", to_string(name), "(\n",
+      ".visible .entry ",
+      to_string(name),
+      "(\n",
       params
       |> Enum.map(fn p -> [@tab, ".param .", to_string(p.type), " ", to_string(p.name)] end)
       |> Enum.intersperse(",\n"),
@@ -119,14 +125,23 @@ defmodule Gpark.PTX do
 
   defp block(%{label: label, instrs: instrs, term: term}) do
     [
-      label_prefix(label), ":\n",
+      label_prefix(label),
+      ":\n",
       Enum.map(instrs, fn i -> [@tab, line(i)] end),
       if(term, do: [@tab, line(term)], else: [])
     ]
   end
 
-  defp line(%{base: base, space: space, modifier: modifier, vec: vec, dtype: dtype,
-             dest: dest, ops: ops, pred: pred}) do
+  defp line(%{
+         base: base,
+         space: space,
+         modifier: modifier,
+         vec: vec,
+         dtype: dtype,
+         dest: dest,
+         ops: ops,
+         pred: pred
+       }) do
     opcode = opcode(%{base: base, space: space, modifier: modifier, vec: vec, dtype: dtype})
 
     [guard(pred), opcode, join_args(dest, ops), ";\n"]
@@ -191,10 +206,10 @@ defmodule Gpark.PTX do
   def operand({:sreg, name}), do: "%" <> to_string(Map.fetch!(IR.sreg_names(), name))
   def operand({:label, name}), do: label_prefix(name)
   # base only
-  def operand({:addr, base, 0, nil}), do: "[" <> operand(base) <> "]"
+  def operand({:addr, base, {:imm, 0}, nil}), do: "[" <> operand(base) <> "]"
 
   # base + constant byte offset
-  def operand({:addr, base, offset, nil}) when is_integer(offset) do
+  def operand({:addr, base, {:imm, offset}, nil}) when is_integer(offset) do
     "[" <> operand(base) <> "+" <> Integer.to_string(offset) <> "]"
   end
 
@@ -243,7 +258,10 @@ defmodule Gpark.PTX do
   # A `.reg` declaration listing: `%f1<3>`.
   defp register(class, ids) when is_list(ids) do
     prefix = "%" <> class_prefix(class)
-    ids |> compress() |> Enum.map_join(", ", fn {first, last} -> prefix <> run_text(first, last) end)
+
+    ids
+    |> compress()
+    |> Enum.map_join(", ", fn {first, last} -> prefix <> run_text(first, last) end)
   end
 
   defp run_text(id, id), do: Integer.to_string(id)

@@ -1,0 +1,381 @@
+{
+  "blocks": [
+    {
+      "instrs": [
+        {
+          "base": "ld",
+          "dest": [
+            "reg",
+            "u64",
+            1
+          ],
+          "dtype": "u64",
+          "modifier": null,
+          "ops": [
+            [
+              "param",
+              "x"
+            ]
+          ],
+          "pred": null,
+          "space": "param",
+          "vec": null
+        },
+        {
+          "base": "ld",
+          "dest": [
+            "reg",
+            "u64",
+            2
+          ],
+          "dtype": "u64",
+          "modifier": null,
+          "ops": [
+            [
+              "param",
+              "y"
+            ]
+          ],
+          "pred": null,
+          "space": "param",
+          "vec": null
+        },
+        {
+          "base": "ld",
+          "dest": [
+            "reg",
+            "u64",
+            3
+          ],
+          "dtype": "u64",
+          "modifier": null,
+          "ops": [
+            [
+              "param",
+              "out"
+            ]
+          ],
+          "pred": null,
+          "space": "param",
+          "vec": null
+        },
+        {
+          "base": "ld",
+          "dest": [
+            "reg",
+            "f32",
+            1
+          ],
+          "dtype": "f32",
+          "modifier": null,
+          "ops": [
+            [
+              "param",
+              "alpha"
+            ]
+          ],
+          "pred": null,
+          "space": "param",
+          "vec": null
+        },
+        {
+          "base": "ld",
+          "dest": [
+            "reg",
+            "u32",
+            2
+          ],
+          "dtype": "u32",
+          "modifier": null,
+          "ops": [
+            [
+              "param",
+              "n"
+            ]
+          ],
+          "pred": null,
+          "space": "param",
+          "vec": null
+        },
+        {
+          "base": "mov",
+          "dest": [
+            "reg",
+            "u32",
+            3
+          ],
+          "dtype": "u32",
+          "modifier": null,
+          "ops": [
+            [
+              "sreg",
+              "ctaid_x"
+            ]
+          ],
+          "pred": null,
+          "space": null,
+          "vec": null
+        },
+        {
+          "base": "setp",
+          "dest": [
+            "pred",
+            1
+          ],
+          "dtype": "u32",
+          "modifier": "ge",
+          "ops": [
+            [
+              "reg",
+              "u32",
+              3
+            ],
+            [
+              "reg",
+              "u32",
+              2
+            ]
+          ],
+          "pred": null,
+          "space": null,
+          "vec": null
+        },
+        {
+          "base": "not",
+          "dest": [
+            "pred",
+            2
+          ],
+          "dtype": "pred",
+          "modifier": null,
+          "ops": [
+            [
+              "pred",
+              1
+            ]
+          ],
+          "pred": null,
+          "space": null,
+          "vec": null
+        },
+        {
+          "base": "bra",
+          "dest": null,
+          "dtype": null,
+          "modifier": null,
+          "ops": [
+            [
+              "label",
+              "done"
+            ]
+          ],
+          "pred": [
+            "pred",
+            2
+          ],
+          "space": null,
+          "vec": null
+        },
+        {
+          "base": "mul.wide",
+          "dest": [
+            "reg",
+            "u64",
+            4
+          ],
+          "dtype": "u32",
+          "modifier": null,
+          "ops": [
+            [
+              "reg",
+              "u32",
+              3
+            ],
+            [
+              "imm",
+              4
+            ]
+          ],
+          "pred": null,
+          "space": null,
+          "vec": null
+        },
+        {
+          "base": "ld",
+          "dest": [
+            "reg",
+            "f32",
+            2
+          ],
+          "dtype": "f32",
+          "modifier": null,
+          "ops": [
+            [
+              "addr",
+              [
+                "reg",
+                "u64",
+                1
+              ],
+              [
+                "reg",
+                "u64",
+                4
+              ],
+              null
+            ]
+          ],
+          "pred": null,
+          "space": "global",
+          "vec": null
+        },
+        {
+          "base": "ld",
+          "dest": [
+            "reg",
+            "f32",
+            3
+          ],
+          "dtype": "f32",
+          "modifier": null,
+          "ops": [
+            [
+              "addr",
+              [
+                "reg",
+                "u64",
+                2
+              ],
+              [
+                "reg",
+                "u64",
+                4
+              ],
+              null
+            ]
+          ],
+          "pred": null,
+          "space": "global",
+          "vec": null
+        },
+        {
+          "base": "fma",
+          "dest": [
+            "reg",
+            "f32",
+            4
+          ],
+          "dtype": "f32",
+          "modifier": "rn",
+          "ops": [
+            [
+              "reg",
+              "f32",
+              1
+            ],
+            [
+              "reg",
+              "f32",
+              2
+            ],
+            [
+              "reg",
+              "f32",
+              3
+            ]
+          ],
+          "pred": null,
+          "space": null,
+          "vec": null
+        },
+        {
+          "base": "st",
+          "dest": null,
+          "dtype": "f32",
+          "modifier": null,
+          "ops": [
+            [
+              "addr",
+              [
+                "reg",
+                "u64",
+                3
+              ],
+              [
+                "reg",
+                "u64",
+                4
+              ],
+              null
+            ],
+            [
+              "reg",
+              "f32",
+              4
+            ]
+          ],
+          "pred": null,
+          "space": "global",
+          "vec": null
+        }
+      ],
+      "label": "entry",
+      "term": {
+        "base": "ret",
+        "dest": null,
+        "dtype": null,
+        "modifier": null,
+        "ops": [],
+        "pred": null,
+        "space": null,
+        "vec": null
+      }
+    },
+    {
+      "instrs": [],
+      "label": "done",
+      "term": {
+        "base": "ret",
+        "dest": null,
+        "dtype": null,
+        "modifier": null,
+        "ops": [],
+        "pred": null,
+        "space": null,
+        "vec": null
+      }
+    }
+  ],
+  "maxntid": null,
+  "name": "saxpy_f32",
+  "params": [
+    {
+      "name": "x",
+      "space": "global",
+      "type": "u64"
+    },
+    {
+      "name": "y",
+      "space": "global",
+      "type": "u64"
+    },
+    {
+      "name": "out",
+      "space": "global",
+      "type": "u64"
+    },
+    {
+      "name": "alpha",
+      "space": "global",
+      "type": "f32"
+    },
+    {
+      "name": "n",
+      "space": "global",
+      "type": "u32"
+    }
+  ],
+  "ptx_version": "8.7",
+  "shared": 0,
+  "target": "sm_80"
+}

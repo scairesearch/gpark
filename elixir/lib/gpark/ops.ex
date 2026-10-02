@@ -85,7 +85,10 @@ defmodule Gpark.Ops do
 
     # memory
     {"ld", [:name, :space, :modifier, :vec, :dtype], @mem_types, 1, 1, :any,
-     [spaces: [:global, :shared, :local, :const, :param], modifiers: [nil, "nc", "volatile", "cv"]]},
+     [
+       spaces: [:global, :shared, :local, :const, :param],
+       modifiers: [nil, "nc", "volatile", "cv"]
+     ]},
     {"st", [:name, :space, :modifier, :vec, :dtype], @mem_types, 0, 2, :any,
      [spaces: [:global, :shared, :local, :param], modifiers: [nil, "wb", "cg", "cs", "wt"]]},
     {"prefetch", [:name, :space], [], 0, 1, :any, [spaces: [:global, :local]]},
@@ -152,7 +155,8 @@ defmodule Gpark.Ops do
   def names, do: table() |> Map.keys() |> Enum.sort()
 
   @doc "Opcodes marked `sync: true`, i.e. warp-synchronous ones."
-  def sync_ops, do: table() |> Enum.filter(fn {_n, s} -> s.sync end) |> Enum.map(&elem(&1, 0)) |> Enum.sort()
+  def sync_ops,
+    do: table() |> Enum.filter(fn {_n, s} -> s.sync end) |> Enum.map(&elem(&1, 0)) |> Enum.sort()
 
   @doc """
   Memory-addressed opcodes, which is what the scheduler must treat specially

@@ -21,6 +21,8 @@ defmodule Gpark.IR.JSON do
 
   @doc "Decode a kernel from JSON text."
   def decode!(json) do
+    preload_vocabulary()
+
     json
     |> Jason.decode!()
     |> from_map()
@@ -37,7 +39,7 @@ defmodule Gpark.IR.JSON do
   # ---------------------------------------------------------------------------
 
   defp from_map(%{"blocks" => blocks} = map) do
-    IR.kernel(binary_to_atom(map["name"]),
+    IR.kernel(name(map["name"]),
       target: map["target"],
       ptx_version: map["ptx_version"],
       shared: map["shared"] || 0,
@@ -60,23 +62,37 @@ defmodule Gpark.IR.JSON do
   end
 
   defp from_param(%{"name" => name, "type" => type} = p) do
-    IR.param_decl(binary_to_atom(name), binary_to_atom(type),
-      p["space"] && binary_to_atom(p["space"]))
+    IR.param_decl(
+      name(name),
+      vocab(type),
+      p["space"] && vocab(p["space"])
+    )
   end
 
   defp to_param(p) do
-    %{"name" => to_string(p.name), "type" => to_string(p.type), "space" => to_string(p.space)}
+    %{
+      "name" => to_string(p.name),
+      "type" => to_string(p.type),
+      # nil must stay nil: `to_string(nil)` is "", which decodes back as an atom
+      # rather than as "absent", so the codec would stop being a fixed point.
+      "space" => p.space && to_string(p.space)
+    }
   end
 
   defp from_block(%{"label" => label} = b) do
-    IR.block(binary_to_atom(label),
+    IR.block(
+      name(label),
       Enum.map(b["instrs"] || [], &from_instr/1),
-      b["term"] && from_instr(b["term"]))
+      b["term"] && from_instr(b["term"])
+    )
   end
 
   defp to_block(b) do
-    %{"label" => to_string(b.label), "instrs" => Enum.map(b.instrs, &to_instr/1),
-      "term" => b.term && to_instr(b.term)}
+    %{
+      "label" => to_string(b.label),
+      "instrs" => Enum.map(b.instrs, &to_instr/1),
+      "term" => b.term && to_instr(b.term)
+    }
   end
 
   # ---------------------------------------------------------------------------
@@ -85,16 +101,35 @@ defmodule Gpark.IR.JSON do
 
   @keys ~w(base space modifier vec dtype dest ops pred)
 
-  # Corpus files are trusted input (they live in this repo), and the atom set is
-  # closed, so interning is safe here and keeps the codec allocation-free.
-  defp binary_to_atom(value) when is_binary(value), do: String.to_existing_atom(value)
+  # Atom handling is split deliberately, because the two kinds of name have
+  # opposite safety properties:
+  #
+  #   * vocab/1 uses String.to_existing_atom/1. Type names, address spaces and
+  #     special registers come from a closed set, so refusing an unknown value
+  #     turns a typo into an error instead of silently inventing a type. That
+  #     only works if the vocabularies have been loaded, which is why
+  #     decode!/1 preloads them: decoding a spec before ever calling the emitter
+  #     used to crash with "not an already existing atom".
+  #
+  #   * name/1 uses String.to_atom/1. Kernel, parameter and block names are
+  #     open-ended, so they cannot come from a fixed set. Corpus files are trusted
+  #     project data, not user input.
+  defp preload_vocabulary do
+    _ = Gpark.Type.all()
+    _ = Gpark.Ops.names()
+    _ = IR.sreg_names()
+    :ok
+  end
+
+  defp vocab(value) when is_binary(value), do: String.to_existing_atom(value)
+  defp name(value) when is_binary(value), do: String.to_atom(value)
 
   defp from_instr(%{"base" => base} = m) do
     IR.instr(base,
-      space: m["space"] && binary_to_atom(m["space"]),
+      space: m["space"] && vocab(m["space"]),
       modifier: m["modifier"],
       vec: m["vec"],
-      dtype: m["dtype"] && binary_to_atom(m["dtype"]),
+      dtype: m["dtype"] && vocab(m["dtype"]),
       dest: m["dest"] && from_operand(m["dest"]),
       ops: Enum.map(m["ops"] || [], &from_operand/1),
       pred: m["pred"] && from_operand(m["pred"])
@@ -121,16 +156,18 @@ defmodule Gpark.IR.JSON do
   # Operands, as tagged tuples
   # ---------------------------------------------------------------------------
 
-  defp from_operand(["reg", type, id]), do: IR.reg(binary_to_atom(type), id)
+  defp from_operand(["reg", type, id]), do: IR.reg(vocab(type), id)
   defp from_operand(["pred", id]), do: IR.pred(id)
   defp from_operand(["imm", value]), do: IR.imm(value)
-  defp from_operand(["immf", type, value]), do: IR.immf(binary_to_atom(type), value)
-  defp from_operand(["param", name]), do: IR.param(binary_to_atom(name))
-  defp from_operand(["sreg", name]), do: IR.sreg(binary_to_atom(name))
-  defp from_operand(["label", name]), do: IR.label(binary_to_atom(name))
+  defp from_operand(["immf", type, value]), do: IR.immf(vocab(type), value)
+  defp from_operand(["param", name]), do: IR.param(name(name))
+  defp from_operand(["sreg", name]), do: IR.sreg(vocab(name))
+  defp from_operand(["label", name]), do: IR.label(name(name))
 
   defp from_operand(["addr", base, idx, scale]),
     do: IR.addr(from_operand(base), from_operand(idx), scale)
+
+  defp from_operand(value) when is_integer(value), do: {:imm, value}
 
   defp from_operand(other), do: raise(ArgumentError, "unknown operand #{inspect(other)}")
 
@@ -141,6 +178,11 @@ defmodule Gpark.IR.JSON do
   defp to_operand({:param, name}), do: ["param", to_string(name)]
   defp to_operand({:sreg, name}), do: ["sreg", to_string(name)]
   defp to_operand({:label, name}), do: ["label", to_string(name)]
+
   defp to_operand({:addr, base, idx, scale}),
     do: ["addr", to_operand(base), to_operand(idx), scale]
+
+  # Tolerate bare integers so a hand-written spec stays decodable even though
+  # IR.addr/3 always normalises them into `imm` first.
+  defp to_operand(value) when is_integer(value), do: ["imm", value]
 end

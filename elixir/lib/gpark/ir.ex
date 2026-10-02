@@ -76,6 +76,7 @@ defmodule Gpark.IR do
   PTX that `ptxas` rejects.
   """
   def reg_class(type)
+
   def reg_class(type) when is_atom(type) do
     cond do
       type in [:s64, :u64, :b64] -> :rd
@@ -104,11 +105,22 @@ defmodule Gpark.IR do
   # ---------------------------------------------------------------------------
 
   @sreg_names %{
-    tid_x: "tid.x", tid_y: "tid.y", tid_z: "tid.z",
-    ctaid_x: "ctaid.x", ctaid_y: "ctaid.y", ctaid_z: "ctaid.z",
-    ntid_x: "ntid.x", ntid_y: "ntid.y", ntid_z: "ntid.z",
-    nctaid_x: "nctaid.x", nctaid_y: "nctaid.y", nctaid_z: "nctaid.z",
-    laneid: "laneid", warpid: "warpid", nwarpid: "nwarpid", griddep: "griddep"
+    tid_x: "tid.x",
+    tid_y: "tid.y",
+    tid_z: "tid.z",
+    ctaid_x: "ctaid.x",
+    ctaid_y: "ctaid.y",
+    ctaid_z: "ctaid.z",
+    ntid_x: "ntid.x",
+    ntid_y: "ntid.y",
+    ntid_z: "ntid.z",
+    nctaid_x: "nctaid.x",
+    nctaid_y: "nctaid.y",
+    nctaid_z: "nctaid.z",
+    laneid: "laneid",
+    warpid: "warpid",
+    nwarpid: "nwarpid",
+    griddep: "griddep"
   }
 
   @doc "Special registers, keyed to their PTX spelling."
@@ -196,7 +208,21 @@ defmodule Gpark.IR do
   on one code path instead of two.
   """
   def addr(base, offset_or_idx \\ 0, scale \\ nil)
-  def addr(base, offset, scale), do: {:addr, base, offset, scale}
+
+  # Normalise a bare integer offset into an `imm` operand. Invariant: every
+  # element of an `ops` list is an operand tuple, never a raw Elixir integer.
+  # The JSON codec and the validator both rely on that, and breaking it silently
+  # only shows up later as an unencodable kernel.
+  def addr(base, offset, scale), do: {:addr, base, operand(offset), scale}
+
+  defp operand({:imm, _} = imm), do: imm
+  defp operand({:immf, _, _} = immf), do: immf
+  defp operand({:reg, _, _} = reg), do: reg
+  defp operand({:pred, _} = pred), do: pred
+  defp operand({:param, _} = param), do: param
+  defp operand({:sreg, _} = sreg), do: sreg
+  defp operand({:label, _} = label), do: label
+  defp operand(value) when is_integer(value), do: {:imm, value}
 
   @doc "Build a basic block terminated by `term`."
   def block(label, instrs, term), do: %{label: label, instrs: instrs, term: term}

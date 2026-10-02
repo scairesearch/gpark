@@ -26,7 +26,9 @@ defmodule RiscGP.Model.Params do
   @spec all() :: [Param.t()]
   def all do
     shared() ++ reference_params() ++
-      for(product <- @products, node <- @nodes, do: config(product, node))
+      Enum.flat_map(@products, fn product ->
+        Enum.flat_map(@nodes, fn node -> config(product, node) end)
+      end)
   end
 
   defp shared do
@@ -101,8 +103,10 @@ defp core_config(product, node) do
       Param.estimated(n.("noc_pj_per_flit"), if(wide, do: 5.0, else: 6.0), "pJ", "#{read_port_bits}-bit flit per hop"),
       Param.estimated(n.("noc_bytes_per_cycle_per_link"), if(wide, do: 16.0, else: 8.0), "B/cyc"),
       Param.estimated(n.("dma_bytes_per_cycle"), if(wide, do: 32.0, else: 16.0), "B/cyc"),
-      Param.estimated(n.("dram_channels"), opts[:dram_channels], "channels"),
-      Param.estimated(n.("dram_bits_per_channel"), opts[:dram_bits], "b"),
+      Param.estimated(n.("dram_channels"), dram_channels, "channels",
+        if(product == :dc, do: "DDR5 6400", else: "LPDDR5X 8533")
+      ),
+      Param.estimated(n.("dram_bits_per_channel"), dram_bits, "b"),
       Param.estimated(n.("dram_bytes_per_cycle_peak"), dram_bytes_per_cycle, "B/cyc", "derived from channels x MT/s x SoC clock"),
       Param.estimated(n.("dram_efficiency"), if(wide, do: 0.75, else: 0.70), "ratio"),
       Param.estimated(n.("dram_pj_per_bit"), if(wide, do: 4.0, else: 5.0), "pJ/bit", "LPDDR5X or DDR5, DRAM-inclusive"),

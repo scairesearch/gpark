@@ -48,10 +48,12 @@ defmodule Gpark.Validate do
 
   @doc "Validate a list of kernels at once, collecting issues across all of them."
   def check_all(kernels) when is_list(kernels) do
-    case Enum.flat_map(kernels, fn k -> case check(k) do
-           {:error, issues} -> issues
-           {:ok, _} -> []
-         end end) do
+    case Enum.flat_map(kernels, fn k ->
+           case check(k) do
+             {:error, issues} -> issues
+             {:ok, _} -> []
+           end
+         end) do
       [] -> :ok
       issues -> {:error, issues}
     end
@@ -65,7 +67,8 @@ defmodule Gpark.Validate do
       params: params,
       labels: labels,
       written: MapSet.new(),
-      typed: %{},        # reg id -> type
+      # reg id -> type
+      typed: %{},
       exits: 0,
       issues: []
     }
@@ -119,16 +122,20 @@ defmodule Gpark.Validate do
         if block.term do
           note_exit(block.term, ctx)
         else
-          issue(ctx, :unterminated_block,
+          issue(
+            ctx,
+            :unterminated_block,
             "block #{inspect(block.label)} has no terminator",
-            block.label, length(block.instrs) - 1)
+            block.label,
+            length(block.instrs) - 1
+          )
         end
 
       ctx
     end)
   end
 
-    defp note_exit(%{base: "exit"}, ctx) do
+  defp note_exit(%{base: "exit"}, ctx) do
     issue(ctx, :multiple_exits, "kernel contains more than one exit")
   end
 
@@ -161,17 +168,25 @@ defmodule Gpark.Validate do
 
     ctx =
       if actual_dests != spec.ndest do
-        issue(ctx, :dest_arity,
+        issue(
+          ctx,
+          :dest_arity,
           "#{base} expects #{spec.ndest} destination(s), got #{actual_dests}",
-          block.label, index)
+          block.label,
+          index
+        )
       else
         ctx
       end
 
     if length(ops) != spec.nops do
-      issue(ctx, :operand_arity,
+      issue(
+        ctx,
+        :operand_arity,
         "#{base} expects #{spec.nops} operand(s), got #{length(ops)}",
-        block.label, index)
+        block.label,
+        index
+      )
     else
       ctx
     end
@@ -182,12 +197,17 @@ defmodule Gpark.Validate do
     case spec do
       %{modifiers: allowed} when is_list(allowed) and allowed != [] ->
         mod = modifier_of(block, index)
+
         if allowed == [nil] or mod in allowed do
           ctx
         else
-          issue(ctx, :bad_modifier,
+          issue(
+            ctx,
+            :bad_modifier,
             "modifier #{inspect(mod)} not permitted here (allowed: #{inspect(allowed)})",
-            block.label, index)
+            block.label,
+            index
+          )
         end
 
       _ ->
@@ -211,17 +231,25 @@ defmodule Gpark.Validate do
     # `ret`, `bar`, …), so there is nothing to check.
     ctx =
       if spec.dtype != [] and instr.dtype not in spec.dtype do
-        issue(ctx, :bad_type,
+        issue(
+          ctx,
+          :bad_type,
           "#{instr.base} does not support type #{inspect(instr.dtype)} (allowed: #{inspect(spec.dtype)})",
-          block.label, index)
+          block.label,
+          index
+        )
       else
         ctx
       end
 
     if is_list(spec.spaces) and instr.space not in spec.spaces do
-      issue(ctx, :bad_space,
+      issue(
+        ctx,
+        :bad_space,
         "#{instr.base} does not support address space #{inspect(instr.space)}",
-        block.label, index)
+        block.label,
+        index
+      )
     else
       ctx
     end
@@ -242,7 +270,12 @@ defmodule Gpark.Validate do
           # Note: `issue/5` returns an updated ctx, so it must not be wrapped in
           # push/2 — that would append the entire context to the issues list.
           ctx
-          |> issue(:unknown_label, "branch to undefined block #{inspect(target)}", block.label, index)
+          |> issue(
+            :unknown_label,
+            "branch to undefined block #{inspect(target)}",
+            block.label,
+            index
+          )
           |> Map.update!(:labels, &MapSet.put(&1, target))
         end
 
@@ -250,14 +283,26 @@ defmodule Gpark.Validate do
         if MapSet.member?(ctx.params, name) do
           ctx
         else
-          issue(ctx, :unknown_param, "reference to undefined parameter #{inspect(name)}", block.label, index)
+          issue(
+            ctx,
+            :unknown_param,
+            "reference to undefined parameter #{inspect(name)}",
+            block.label,
+            index
+          )
         end
 
       {:sreg, name}, ctx ->
         if Map.has_key?(IR.sreg_names(), name) do
           ctx
         else
-          issue(ctx, :unknown_sreg, "unknown special register #{inspect(name)}", block.label, index)
+          issue(
+            ctx,
+            :unknown_sreg,
+            "unknown special register #{inspect(name)}",
+            block.label,
+            index
+          )
         end
 
       _op, ctx ->
@@ -284,9 +329,13 @@ defmodule Gpark.Validate do
           ctx
 
         previous ->
-          issue(ctx, :register_type_conflict,
+          issue(
+            ctx,
+            :register_type_conflict,
             "%#{class}#{id} used as #{type} here but #{previous} earlier",
-            block.label, index)
+            block.label,
+            index
+          )
       end
     end)
   end
@@ -306,8 +355,13 @@ defmodule Gpark.Validate do
       if MapSet.member?(ctx.written, {class, id}) do
         ctx
       else
-        issue(ctx, :uninitialised_register,
-          "read of never-written register %#{class}#{id}", block.label, index)
+        issue(
+          ctx,
+          :uninitialised_register,
+          "read of never-written register %#{class}#{id}",
+          block.label,
+          index
+        )
       end
     end)
   end
