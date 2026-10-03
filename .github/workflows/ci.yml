@@ -70,11 +70,27 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: Jimver/cuda-toolkit@v0.2.16
-        with:
-          cuda: '12.1.0'
-          method: network
-          sub-packages: '["ptxas"]'
+      # Installed by hand rather than through Jimver/cuda-toolkit, which has two
+      # independent reasons to fail against ubuntu2404 today:
+      #
+      #   * it fetches cuda-keyring_1.0-1_all.deb, which 404s -- NVIDIA renamed it
+      #     to _1.1-1_
+      #   * it asks for cuda-nvcc-12-1, which NVIDIA has since rotated out of the
+      #     ubuntu2404 index entirely. The published 12.x are 12-5, 12-6, 12-8, 12-9.
+      #
+      # Either one alone is enough to lose the job in setup, which is why it had
+      # never once reached `make remote`. Both were confirmed by reading NVIDIA's
+      # live repo index rather than by guessing.
+      #
+      # gpark emits .version 8.7, which any CUDA 12.x ptxas accepts.
+      - name: Install ptxas
+        run: |
+          set -euo pipefail
+          curl -fsSLO https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2404/x86_64/cuda-keyring_1.1-1_all.deb
+          sudo dpkg -i cuda-keyring_1.1-1_all.deb
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends cuda-nvcc-12-8
+          /usr/local/cuda-12.8/bin/ptxas --version
 
       # ptxas does not need a GPU, so tier two belongs in CI even though the rest
       # of the CUDA story does not. This is the gate that catches a hand-written
@@ -82,5 +98,10 @@ jobs:
       # no-allocator design makes possible. It is also the only check in this file
       # that knows anything about a real NVIDIA toolchain; everything in `test` is
       # gpark agreeing with itself.
+      #
+      # GPARK_PTXAS is set explicitly because cuda-nvcc installs under
+      # /usr/local/cuda-12.8/bin, which is not on PATH on a hosted runner.
       - name: Assemble every golden, fail on spills
+        env:
+          GPARK_PTXAS: /usr/local/cuda-12.8/bin/ptxas
         run: make remote GPARK_ARCH=sm_80
