@@ -113,6 +113,10 @@ jobs:
       # which forms ptxas rejects. Keep continue-on-error while this is how
       # PTX emission is being debugged.
       - name: PTX conformance probe
+        # Runs even when the gate above fails -- that is the whole point. Without
+        # this the probe is skipped exactly when it is needed, since the gate is
+        # what fails first.
+        if: always()
         continue-on-error: true
         env:
           GPARK_PTXAS: /usr/local/cuda-12.8/bin/ptxas
