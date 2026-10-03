@@ -105,3 +105,15 @@ jobs:
         env:
           GPARK_PTXAS: /usr/local/cuda-12.8/bin/ptxas
         run: make remote GPARK_ARCH=sm_80
+
+      # The goldens above are the gate. This is the diagnosis: when they fail,
+      # the error text is a cascade ("Arguments mismatch" on every instruction
+      # after the first bad one) and cannot be bisected by reading it. This
+      # assembles each suspect construct on its own so one run says exactly
+      # which forms ptxas rejects. Keep continue-on-error while this is how
+      # PTX emission is being debugged.
+      - name: PTX conformance probe
+        continue-on-error: true
+        env:
+          GPARK_PTXAS: /usr/local/cuda-12.8/bin/ptxas
+        run: remote/ptx_probe.sh "${GPARK_PTXAS}"
