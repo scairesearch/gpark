@@ -38,11 +38,21 @@ else
   FILES=("${CORPUS}"/*.ptx)
 fi
 
-if ! command -v ptxas >/dev/null 2>&1; then
-  cat >&2 <<'EOF'
-error: ptxas not found on PATH.
+# Resolve GPARK_PTXAS *before* the presence check. Checking `command -v ptxas`
+# first made the override useless: the error message told you to set
+# GPARK_PTXAS, setting it still failed, because the guard had already decided
+# ptxas was missing. That is the normal state on a hosted runner and on any
+# machine where CUDA lives outside PATH, so it was the common case broken.
+PTXAS="${GPARK_PTXAS:-ptxas}"
 
-Install the CUDA toolkit, or point GPARK_PTXAS at the binary:
+if [[ ! -x "${PTXAS}" ]] && ! command -v "${PTXAS}" >/dev/null 2>&1; then
+  cat >&2 <<EOF
+error: no usable ptxas.
+
+Looked for "${PTXAS}".
+
+Install the CUDA toolkit, or point GPARK_PTXAS at the binary. CUDA usually
+lands outside PATH, so the explicit path is usually what you want:
 
     GPARK_PTXAS=/usr/local/cuda/bin/ptxas remote/ptxas_check.sh sm_80
 
@@ -50,8 +60,6 @@ See docs/VALIDATION.md for what this gate does and does not prove.
 EOF
   exit 127
 fi
-
-PTXAS="${GPARK_PTXAS:-ptxas}"
 
 if [[ ! -f "${CORPUS}/.gitignore" ]]; then
   mkdir -p "${CORPUS}"
