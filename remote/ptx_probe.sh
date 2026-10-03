@@ -67,45 +67,90 @@ ${body}
 echo "ptxas: $("${PTXAS}" --version | tail -1)"
 echo
 
-# --- addressing forms ------------------------------------------------------
-# gpark's whole model is base + offset, and `mul.wide.u32` into a .u64 then
-# used as an address operand fails to parse. PTX register+register addressing
-# is 32-bit-offset specific; this asks which forms actually parse.
-run_case addr_single '	.reg .u64 %rd1;
-	.reg .f32 %f1;'          '	ld.global.f32 %f1, [%rd1];'
-run_case addr_rd_plus_rd64 '	.reg .u64 %rd1;
+# --- materialising the address ---------------------------------------------
+# Register+register addressing is not a syntax slip to be repaired, it does
+# not exist in PTX for ld/st: [%rd+%rd], [%rd+%r] and [%r+%rd] all fail to
+# parse. Only [reg] and [reg+imm] are accepted.
+#
+# That matters because base + runtime-computed offset is gpark's entire
+# addressing model: an index that is not known until launch cannot become an
+# immediate. So the question is not which spelling is right, it is whether
+# the address can be built in a register at all.
+run_case addr_add_s64 '	.reg .u64 %rd1;
 	.reg .u64 %rd2;
-	.reg .f32 %f1;'          '	ld.global.f32 %f1, [%rd1+%rd2];'
-run_case addr_rd_plus_r32 '	.reg .u64 %rd1;
-	.reg .u32 %r1;
-	.reg .f32 %f1;'          '	ld.global.f32 %f1, [%rd1+%r1];'
-run_case addr_rd_plus_imm '	.reg .u64 %rd1;
-	.reg .f32 %f1;'          '	ld.global.f32 %f1, [%rd1+4];'
-run_case addr_r32_plus_rd '	.reg .u64 %rd1;
-	.reg .u32 %r1;
-	.reg .f32 %f1;'          '	ld.global.f32 %f1, [%r1+%rd1];'
+	.reg .f32 %f1;'          '	add.s64 %rd1, %rd1, %rd2;
+	ld.global.f32 %f1, [%rd1];'
+run_case addr_add_u64 '	.reg .u64 %rd1;
+	.reg .u64 %rd2;
+	.reg .f32 %f1;'          '	add.u64 %rd1, %rd1, %rd2;
+	ld.global.f32 %f1, [%rd1];'
+run_case addr_add_imm '	.reg .u64 %rd1;
+	.reg .f32 %f1;'          '	add.s64 %rd1, %rd1, 4;
+	ld.global.f32 %f1, [%rd1];'
 
-# --- producing the offset --------------------------------------------------
-# If register+register addressing needs a 32-bit offset, the emitter has to
-# stop widening to .u64. Check what is available for that.
-run_case widen_mulwide_u64 '	.reg .u32 %r1;
-	.reg .u64 %rd1;'        '	mul.wide.u32 %rd1, %r1, 4;'
-run_case offset_u32_mul '	.reg .u32 %r1;
-	.reg .u32 %r2;'         '	mul.lo.u32 %r2, %r1, 4;'
-run_case widen_cvt '	.reg .u32 %r1;
-	.reg .u64 %rd1;'        '	cvt.u64.u32 %rd1, %r1;'
-run_case shl_u32 '	.reg .u32 %r1;'            '	shl.b32 %r1, %r1, 2;'
-
-# --- the full saxpy addressing chain, both candidate fixes -----------------
-run_case saxpy_offset_u32 '	.reg .u64 %rd1;
+# --- a complete kernel, the shape the emitter should produce ---------------
+# saxpy_f32 rebuilt with the address materialised in a register. If this
+# assembles, the fix is mechanical: the emitter stops folding base+offset into
+# the addressing mode and emits add.s64 into a scratch register instead.
+# Writes to that scratch register are part of gpark's design already -- it
+# allocates explicitly and never reuses -- so this costs registers, not
+# correctness.
+run_full full_saxpy '.version 8.7
+.target sm_80
+.address_size 64
+.visible .entry saxpy_f32(
+	.param .u64 x,
+	.param .u64 y,
+	.param .u64 out,
+	.param .f32 alpha,
+	.param .u32 n
+)
+{
+	.reg .pred %p1;
+	.reg .pred %p2;
 	.reg .u32 %r1;
 	.reg .u32 %r2;
-	.reg .f32 %f1;'          '	mov.u32 %r1, %ctaid.x;
-	mul.lo.u32 %r2, %r1, 4;
-	ld.global.f32 %f1, [%rd1+%r2];'
-run_case saxpy_offset_wide '	.reg .u64 %rd1;
-	.reg .u32 %r1;
+	.reg .u64 %rd1;
 	.reg .u64 %rd2;
-	.reg .f32 %f1;'          '	mov.u32 %r1, %ctaid.x;
-	mul.wide.u32 %rd2, %r1, 4;
-	ld.global.f32 %f1, [%rd1+%rd2];'
+	.reg .u64 %rd3;
+	.reg .u64 %rd4;
+	.reg .u64 %rd5;
+	.reg .f32 %f1;
+	.reg .f32 %f2;
+	.reg .f32 %f3;
+$L__entry:
+	ld.param.u64 %rd1, [x];
+	ld.param.u64 %rd2, [y];
+	ld.param.u64 %rd3, [out];
+	ld.param.f32 %f1, [alpha];
+	ld.param.u32 %r1, [n];
+	mov.u32 %r2, %ctaid.x;
+	setp.ge.u32 %p1, %r2, %r1;
+	not.pred %p2, %p1;
+	@%p2 bra $L__done;
+	mul.wide.u32 %rd4, %r2, 4;
+	add.s64 %rd5, %rd1, %rd4;
+	ld.global.f32 %f2, [%rd5];
+	add.s64 %rd5, %rd2, %rd4;
+	ld.global.f32 %f3, [%rd5];
+	mul.f32 %f2, %f2, %f1;
+	add.f32 %f2, %f2, %f3;
+	add.s64 %rd5, %rd3, %rd4;
+	st.global.f32 [%rd5], %f2;
+$L__done:
+	ret;
+}'
+
+# --- the ops the remaining goldens need ------------------------------------
+run_case op_fma '	.reg .f32 %f1;
+	.reg .f32 %f2;
+	.reg .f32 %f3;'          '	fma.rn.f32 %f3, %f1, %f2, %f3;'
+run_case op_prmt '	.reg .b32 %r1;
+	.reg .b32 %r2;
+	.reg .b32 %r3;'          '	prmt.b32 %r3, %r1, %r2, 0x5140;'
+run_case op_shr_sync '	.reg .u32 %r1;'            '	shr.u32 %r1, %r1, 31;'
+run_case op_red '	.reg .u32 %r1;
+	.reg .u32 %r2;
+	.reg .f32 %f1;'          '	max.u32 %r2, %r1, 32;
+	shfl.sync.bfly.b32 %r2, %r2, 16, 32;
+	add.f32 %f1, %f1, %f1;'
