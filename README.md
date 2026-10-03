@@ -6,19 +6,36 @@ overhead — and you cannot fix any of them through an abstraction that hides th
 instructions.
 
 ```elixir
-Gpark.Kernels.VecAddF32.build()
-|> Gpark.Validate.validate!()
-|> Gpark.PTX.emit()
-|> then(&IO.write(IO.iodata_to_binary(&1)))
+{:ok, kernel} =
+  Gpark.Kernels.VecAddF32.build()
+  |> Gpark.Validate.check()
+
+# `emit!/2` takes (backend, kernel), so it reads as a call rather than a pipe.
+Gpark.Backend.emit!(Gpark.PTX, kernel)
+|> IO.write()
 ```
 
 ```python
-from gpark import ir, ops, ptx, validate
+from gpark import decode_spec, ptx, validate
 
-kernel = ir.kernel("vec_add_f32", params=[...], blocks=[...])
-validate.validate(kernel)
+kernel = decode_spec(open("corpus/specs/vec_add_f32.json").read())
+ok, issues = validate.check(kernel)
+assert ok, issues
 print(ptx.emit(kernel))
 ```
+
+`Gpark.Validate.check/1` returns `{:ok, kernel}` or `{:error, issues}`; it does not
+raise, because a caller usually wants to report every problem at once rather than
+the first one. `Gpark.Backend.emit!/2` is the one that raises, because a backend
+lacking an opcode is a programming error rather than something to iterate over. The
+Python `validate.check/1` returns `(ok, issues)` for the same reason.
+
+Note the asymmetry: the four corpus kernels exist as Elixir modules
+(`Gpark.Kernels.*`) but not as Python ones. They are defined once, in
+`corpus/specs/*.json`, and the Elixir side generates them; Python decodes the same
+files. That is the corpus doing its job — one source of truth, two emitters — but it
+does mean the Python quickstart starts from a spec rather than from a hand-built
+kernel.
 
 ## Status
 
