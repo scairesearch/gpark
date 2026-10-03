@@ -67,51 +67,45 @@ ${body}
 echo "ptxas: $("${PTXAS}" --version | tail -1)"
 echo
 
-# --- one .reg per register, no vector form -------------------------------
-# The shape gpark should emit. gpark allocates registers explicitly and never
-# reuses them, so declaring them one per line is both valid and the honest
-# encoding of that. This battery asks whether it assembles at all, for every
-# type gpark uses, and whether each operand name is accepted.
-run_case single_u32      '	.reg .u32 %r1;'  '	mov.u32 %r1, %ctaid.x;'
-run_case single_u64      '	.reg .u64 %rd1;' '	mov.u64 %rd1, %rd1;'
-run_case single_f32      '	.reg .f32 %f1;
-	.reg .f32 %f2;'        '	mov.f32 %f1, %f2;'
-run_case single_pred     '	.reg .pred %p1;' '	setp.ge.s32 %p1, %r1, %r1;'
-run_case single_pred_u32 '	.reg .pred %p1;
-	.reg .u32 %r1;'        '	setp.ge.u32 %p1, %r1, %r1;'
-
-# --- bare vs suffixed operand names, one declaration at a time -------------
-# The earlier battery declared '%r<2>' but wrote '%r' in one case and '%r1' in
-# another, so "digit declaration form" and "bare operand name" were conflated.
-# Separated here: one declaration, one operand name.
-run_case nodigit_decl_bare_operand   '	.reg .u32 %r<2>;'  '	mov.u32 %r, 0;'
-run_case nodigit_decl_suffix_operand '	.reg .u32 %r<2>;'  '	mov.u32 %r1, 0;'
-run_case nodigit_u64_bare            '	.reg .u64 %rd<2>;' '	mov.u64 %rd, %rd;'
-run_case nodigit_u64_suffix          '	.reg .u64 %rd<2>;' '	mov.u64 %rd1, %rd1;'
-run_case nodigit_f32_bare            '	.reg .f32 %f<2>;'  '	mov.f32 %f, %f1;'
-run_case nodigit_f32_suffix          '	.reg .f32 %f<2>;'  '	mov.f32 %f1, %f2;'
-
-# --- the real kernel shapes, declared one per register ---------------------
-# If these pass, fixing the emitter is a one-line-per-register change and the
-# goldens can be regenerated and gated for real.
-run_case shape_ld_param_u64 '	.reg .u64 %rd1;' '	ld.param.u64 %rd1, [x];'
-run_case shape_ld_global_f32 '	.reg .u64 %rd1;
+# --- addressing forms ------------------------------------------------------
+# gpark's whole model is base + offset, and `mul.wide.u32` into a .u64 then
+# used as an address operand fails to parse. PTX register+register addressing
+# is 32-bit-offset specific; this asks which forms actually parse.
+run_case addr_single '	.reg .u64 %rd1;
 	.reg .f32 %f1;'          '	ld.global.f32 %f1, [%rd1];'
-run_case shape_mulwide_u32 '	.reg .u32 %r1;
-	.reg .u64 %rd1;'        '	mul.wide.u32 %rd1, %r1, 4;'
-run_case shape_addr_sum '	.reg .u64 %rd1;
+run_case addr_rd_plus_rd64 '	.reg .u64 %rd1;
 	.reg .u64 %rd2;
 	.reg .f32 %f1;'          '	ld.global.f32 %f1, [%rd1+%rd2];'
-run_case shape_guard '	.reg .pred %p1;
-	.reg .pred %p2;
+run_case addr_rd_plus_r32 '	.reg .u64 %rd1;
 	.reg .u32 %r1;
-	.reg .u32 %r2;'          '	mov.u32 %r1, %ctaid.x;
-	setp.ge.u32 %p1, %r1, %r2;
-	not.pred %p2, %p1;
-	@%p2 bra $L__exit;
-$L__exit:'
-run_case shape_ld_param_f32 '	.reg .f32 %f1;' '	ld.param.f32 %f1, [alpha];'
-run_case shape_ld_param_u32 '	.reg .u32 %r1;' '	ld.param.u32 %r1, [n];'
-run_case shape_st_global_f32 '	.reg .u64 %rd1;
-	.reg .f32 %f1;'          '	st.global.f32 [%rd1], %f1;'
-run_case shape_ret_only '	.reg .u32 %r1;' '	mov.u32 %r1, 0;'
+	.reg .f32 %f1;'          '	ld.global.f32 %f1, [%rd1+%r1];'
+run_case addr_rd_plus_imm '	.reg .u64 %rd1;
+	.reg .f32 %f1;'          '	ld.global.f32 %f1, [%rd1+4];'
+run_case addr_r32_plus_rd '	.reg .u64 %rd1;
+	.reg .u32 %r1;
+	.reg .f32 %f1;'          '	ld.global.f32 %f1, [%r1+%rd1];'
+
+# --- producing the offset --------------------------------------------------
+# If register+register addressing needs a 32-bit offset, the emitter has to
+# stop widening to .u64. Check what is available for that.
+run_case widen_mulwide_u64 '	.reg .u32 %r1;
+	.reg .u64 %rd1;'        '	mul.wide.u32 %rd1, %r1, 4;'
+run_case offset_u32_mul '	.reg .u32 %r1;
+	.reg .u32 %r2;'         '	mul.lo.u32 %r2, %r1, 4;'
+run_case widen_cvt '	.reg .u32 %r1;
+	.reg .u64 %rd1;'        '	cvt.u64.u32 %rd1, %r1;'
+run_case shl_u32 '	.reg .u32 %r1;'            '	shl.b32 %r1, %r1, 2;'
+
+# --- the full saxpy addressing chain, both candidate fixes -----------------
+run_case saxpy_offset_u32 '	.reg .u64 %rd1;
+	.reg .u32 %r1;
+	.reg .u32 %r2;
+	.reg .f32 %f1;'          '	mov.u32 %r1, %ctaid.x;
+	mul.lo.u32 %r2, %r1, 4;
+	ld.global.f32 %f1, [%rd1+%r2];'
+run_case saxpy_offset_wide '	.reg .u64 %rd1;
+	.reg .u32 %r1;
+	.reg .u64 %rd2;
+	.reg .f32 %f1;'          '	mov.u32 %r1, %ctaid.x;
+	mul.wide.u32 %rd2, %r1, 4;
+	ld.global.f32 %f1, [%rd1+%rd2];'
