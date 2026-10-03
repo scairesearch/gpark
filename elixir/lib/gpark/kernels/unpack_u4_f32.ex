@@ -50,6 +50,9 @@ defmodule Gpark.Kernels.UnpackU4F32 do
   @r_tmp 6
   # byte offset of this thread's first output f32
   @rd_out_idx 4
+
+  # Materialised address, shared by the word load and the element store.
+  @rd_addr 5
   @p_in 1
   @p_skip 2
   @f_scale 1
@@ -132,11 +135,16 @@ defmodule Gpark.Kernels.UnpackU4F32 do
         dest: IR.reg(:u64, @rd_word_off),
         ops: [IR.reg(:u32, @r_gid), IR.imm(@in_bytes_per_word)]
       ),
+      IR.instr("add",
+        dtype: :u64,
+        dest: IR.reg(:u64, @rd_addr),
+        ops: [IR.reg(:u64, @rd_in), IR.reg(:u64, @rd_word_off)]
+      ),
       IR.instr("ld",
         dtype: :u32,
         space: :global,
         dest: IR.reg(:u32, @r_word),
-        ops: [IR.addr(IR.reg(:u64, @rd_in), IR.reg(:u64, @rd_word_off))]
+        ops: [IR.addr(IR.reg(:u64, @rd_addr))]
       ),
       # Output element index for the low nibble. Widened to 64 bits *after* the
       # multiply, because gid * 32 overflows u32 long before the array does.
@@ -192,11 +200,16 @@ defmodule Gpark.Kernels.UnpackU4F32 do
             ops: [IR.reg(:u32, source)]
           ),
           scale,
+          IR.instr("add",
+            dtype: :u64,
+            dest: IR.reg(:u64, @rd_addr),
+            ops: [IR.reg(:u64, @rd_out), IR.reg(:u64, @rd_out_idx)]
+          ),
           IR.instr("st",
             dtype: :f32,
             space: :global,
             ops: [
-              IR.addr(IR.reg(:u64, @rd_out), IR.reg(:u64, @rd_out_idx)),
+              IR.addr(IR.reg(:u64, @rd_addr)),
               IR.reg(:f32, @f_v)
             ]
           )

@@ -211,6 +211,32 @@
           "vec": null
         },
         {
+          "base": "add",
+          "dest": [
+            "reg",
+            "u64",
+            5
+          ],
+          "dtype": "u64",
+          "modifier": null,
+          "ops": [
+            [
+              "reg",
+              "u64",
+              1
+            ],
+            [
+              "reg",
+              "u64",
+              4
+            ]
+          ],
+          "pred": null,
+          "space": null,
+          "srctype": null,
+          "vec": null
+        },
+        {
           "base": "ld",
           "dest": [
             "reg",
@@ -225,18 +251,43 @@
               [
                 "reg",
                 "u64",
-                1
+                5
               ],
               [
-                "reg",
-                "u64",
-                4
+                "imm",
+                0
               ],
               null
             ]
           ],
           "pred": null,
           "space": "global",
+          "srctype": null,
+          "vec": null
+        },
+        {
+          "base": "add",
+          "dest": [
+            "reg",
+            "u64",
+            5
+          ],
+          "dtype": "u64",
+          "modifier": null,
+          "ops": [
+            [
+              "reg",
+              "u64",
+              2
+            ],
+            [
+              "reg",
+              "u64",
+              4
+            ]
+          ],
+          "pred": null,
+          "space": null,
           "srctype": null,
           "vec": null
         },
@@ -255,12 +306,11 @@
               [
                 "reg",
                 "u64",
-                2
+                5
               ],
               [
-                "reg",
-                "u64",
-                4
+                "imm",
+                0
               ],
               null
             ]
@@ -302,6 +352,32 @@
           "vec": null
         },
         {
+          "base": "add",
+          "dest": [
+            "reg",
+            "u64",
+            5
+          ],
+          "dtype": "u64",
+          "modifier": null,
+          "ops": [
+            [
+              "reg",
+              "u64",
+              3
+            ],
+            [
+              "reg",
+              "u64",
+              4
+            ]
+          ],
+          "pred": null,
+          "space": null,
+          "srctype": null,
+          "vec": null
+        },
+        {
           "base": "st",
           "dest": null,
           "dtype": "f32",
@@ -312,12 +388,11 @@
               [
                 "reg",
                 "u64",
-                3
+                5
               ],
               [
-                "reg",
-                "u64",
-                4
+                "imm",
+                0
               ],
               null
             ],

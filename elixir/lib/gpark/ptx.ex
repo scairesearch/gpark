@@ -137,6 +137,15 @@ defmodule Gpark.PTX do
   # `.reg` declarations sized from actual usage, so the kernel never allocates a
   # register it does not need — on a register-starved quant kernel that spare
   # vector is a whole extra load in flight.
+  #
+  # One declaration per register, not the `%rd1<4>` vector form. A real ptxas
+  # (12.8) rejects the vector form outright, and the rejection is not obvious
+  # from the error: it reports "Arguments mismatch" on the first *instruction*,
+  # not on the declaration, so it cascades through the whole kernel and looks
+  # like an addressing bug. Confirmed with remote/ptx_probe.sh, where every
+  # `.reg .T %base<N>;` case fails and every single-register case passes.
+  # One per line is also the honest encoding: this design allocates explicitly
+  # and never reuses, so there is nothing to gain by declaring a vector.
   defp declarations(_kernel, []) do
     []
   end
@@ -147,13 +156,15 @@ defmodule Gpark.PTX do
       |> Enum.flat_map(&IR.instr_regs/1)
       |> Enum.group_by(fn {type, class, _id} -> {class, type} end)
       |> Enum.map(fn {{class, type}, regs} ->
-        ids = regs |> Enum.map(&elem(&1, 2)) |> Enum.uniq()
+        ids = regs |> Enum.map(&elem(&1, 2)) |> Enum.uniq() |> Enum.sort()
         {@class_order[class], class, type, ids}
       end)
       |> Enum.sort()
 
-    Enum.map(groups, fn {_order, class, type, ids} ->
-      [@tab, ".reg .", to_string(type), " ", register(class, ids), ";\n"]
+    Enum.flat_map(groups, fn {_order, class, type, ids} ->
+      Enum.map(ids, fn id ->
+        [@tab, ".reg .", to_string(type), " ", register(class, id), ";\n"]
+      end)
     end)
   end
 
@@ -264,12 +275,44 @@ defmodule Gpark.PTX do
     "[" <> operand(base) <> "+" <> Integer.to_string(offset) <> "]"
   end
 
-  # base + register (index held in a register)
-  def operand({:addr, base, idx, nil}), do: "[" <> operand(base) <> "+" <> operand(idx) <> "]"
+  # A register offset is not expressible as a PTX addressing mode and used to
+  # be rendered inline as `[base+idx]`. PTX does not accept it: `[%rd+%rd]`,
+  # `[%rd+%r]` and `[%r+%rd]` all fail to parse in ptxas 12.8, because ld/st
+  # take `[reg]` or `[reg+imm]` only. An index that is not known until launch
+  # cannot become an immediate either, so the only correct encoding is to build
+  # the address in a register first:
+  #
+  #     add.s64 %rd_addr, %rd_base, %rd_off;
+  #     ld.global.f32 %f, [%rd_addr];
+  #
+  # That is deliberately not hidden behind an extra pass in this module. This
+  # design has no hidden allocation, so the register is allocated explicitly by
+  # whoever builds the IR and the address arithmetic is visible in the IR. See
+  # Gpark.DSL.address_materialised/3.
+  def operand({:addr, base, idx, nil}) do
+    raise ArgumentError, """
+    register offsets cannot be rendered as a PTX addressing mode: #{operand(base)}+#{operand(idx)}.
 
-  # strided: base + idx * scale, the shape every tiled kernel wants
+    PTX ld/st accept [reg] or [reg+imm] only; register+register does not parse.
+    Materialise the address into an explicitly allocated register instead:
+
+        add.s64 <addr_reg>, #{operand(base)}, #{operand(idx)};
+        ld.global.f32 <dst>, [<addr_reg>];
+    """
+  end
+
   def operand({:addr, base, idx, scale}) do
-    "[" <> operand(base) <> "+" <> operand(idx) <> "*" <> Integer.to_string(scale) <> "]"
+    raise ArgumentError, """
+    strided addresses (#{operand(base)}+#{operand(idx)}*#{scale}) cannot be
+    rendered as a PTX addressing mode. PTX ld/st accept [reg] or [reg+imm] only.
+
+    Widen the index, then materialise the address into an explicitly allocated
+    register:
+
+        mul.wide.s32 <off_reg>, #{operand(idx)}, #{scale};
+        add.s64 <addr_reg>, #{operand(base)}, <off_reg>;
+        ld.global.f32 <dst>, [<addr_reg>];
+    """
   end
 
   @doc """
@@ -306,43 +349,11 @@ defmodule Gpark.PTX do
     "%" <> class_prefix(class) <> Integer.to_string(id)
   end
 
-  # A `.reg` declaration listing: `%f1<3>`.
-  defp register(class, ids) when is_list(ids) do
-    prefix = "%" <> class_prefix(class)
-
-    ids
-    |> compress()
-    |> Enum.map_join(", ", fn {first, last} -> prefix <> run_text(first, last) end)
-  end
-
-  defp run_text(id, id), do: Integer.to_string(id)
-  defp run_text(first, last), do: "#{first}<#{last - first + 1}>"
-
   defp class_prefix(:p), do: "p"
   defp class_prefix(:r), do: "r"
   defp class_prefix(:rd), do: "rd"
   defp class_prefix(:f), do: "f"
   defp class_prefix(:fd), do: "fd"
-
-  # Compress a sorted id list into PTX's `[%r<4><2>]`-style runs. Used so
-  # declarations look like nvcc output rather than a wall of single registers.
-  defp compress(ids) do
-    {runs, current} =
-      ids
-      |> Enum.sort()
-      |> Enum.reduce({[], nil}, fn id, {acc, cur} ->
-        case cur do
-          nil -> {acc, {id, id}}
-          {first, last} when id <= last + 1 -> {acc, {first, id}}
-          {first, last} -> {[{first, last} | acc], {id, id}}
-        end
-      end)
-
-    case current do
-      nil -> Enum.reverse(runs)
-      {first, last} -> Enum.reverse([{first, last} | runs])
-    end
-  end
 
   defp hex(value, width) do
     value |> Integer.to_string(16) |> String.upcase() |> String.pad_leading(width, "0")

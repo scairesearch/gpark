@@ -74,9 +74,15 @@ def _declarations(instrs: list[dict]) -> list[str]:
                 seen.setdefault((cls, type_name), set()).add(id)
 
     ordered = sorted(seen, key=lambda key: (_CLASS_ORDER[key[0]], key[0], key[1]))
+    # One declaration per register, not the `%rd1<4>` vector form. A real
+    # ptxas rejects the vector form, and unhelpfully: it reports the first
+    # *instruction* rather than the declaration, so the error cascades through
+    # the whole kernel and reads like an addressing bug. The Elixir side makes
+    # the same choice, and these two must agree byte for byte.
     return [
-        f"{_TAB}.reg .{type_name} {_register(cls, sorted(seen[(cls, type_name)]))};\n"
+        f"{_TAB}.reg .{type_name} {_register(cls, [id])};\n"
         for cls, type_name in ordered
+        for id in sorted(seen[(cls, type_name)])
     ]
 
 
@@ -174,9 +180,30 @@ def _operand(o) -> str:
             return f"[{_operand(base)}]"
         if scale is None and idx[0] == "imm":
             return f"[{_operand(base)}+{idx[1]}]"
+        # A register offset is not expressible as a PTX addressing mode. PTX
+        # ld/st accept [reg] or [reg+imm] only; register+register does not
+        # parse. An index unknown until launch cannot become an immediate
+        # either, so the sum has to be built in a register first:
+        #
+        #     add.u64 <addr_reg>, <base>, <off>;
+        #     ld.global.f32 <dst>, [<addr_reg>];
+        #
+        # Refusing here keeps the mistake at the line that made it, instead of
+        # emitting text that passes Gpark.Validate -- it only checks the IR --
+        # and then fails at ptxas far from the cause.
         if scale is None:
-            return f"[{_operand(base)}+{_operand(idx)}]"
-        return f"[{_operand(base)}+{_operand(idx)}*{scale}]"
+            raise ValueError(
+                f"register offsets cannot be rendered as a PTX addressing mode: "
+                f"{_operand(base)}+{_operand(idx)}. "
+                f"PTX ld/st accept [reg] or [reg+imm] only. Materialise the "
+                f"address into an explicitly allocated register instead."
+            )
+        raise ValueError(
+            f"strided addresses ({_operand(base)}+{_operand(idx)}*{scale}) cannot "
+            f"be rendered as a PTX addressing mode. PTX ld/st accept [reg] or "
+            f"[reg+imm] only. Widen the index, then materialise the address into "
+            f"an explicitly allocated register."
+        )
     raise ValueError(f"unknown operand tag {tag!r}")
 
 

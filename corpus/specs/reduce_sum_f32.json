@@ -134,11 +134,11 @@
           "vec": null
         },
         {
-          "base": "shl",
+          "base": "mul.wide",
           "dest": [
             "reg",
-            "u32",
-            4
+            "u64",
+            3
           ],
           "dtype": "u32",
           "modifier": null,
@@ -151,6 +151,32 @@
             [
               "imm",
               2
+            ]
+          ],
+          "pred": null,
+          "space": null,
+          "srctype": null,
+          "vec": null
+        },
+        {
+          "base": "add",
+          "dest": [
+            "reg",
+            "u64",
+            4
+          ],
+          "dtype": "u64",
+          "modifier": null,
+          "ops": [
+            [
+              "reg",
+              "u64",
+              1
+            ],
+            [
+              "reg",
+              "u64",
+              3
             ]
           ],
           "pred": null,
@@ -173,12 +199,11 @@
               [
                 "reg",
                 "u64",
-                1
+                4
               ],
               [
-                "reg",
-                "u32",
-                4
+                "imm",
+                0
               ],
               null
             ]

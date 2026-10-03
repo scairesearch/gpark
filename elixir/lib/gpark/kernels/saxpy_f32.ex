@@ -21,6 +21,9 @@ defmodule Gpark.Kernels.SaxpyF32 do
   @r_n 2
   @r_gid 3
   @rd_off 4
+
+  # Materialised address, shared across the three accesses.
+  @rd_addr 5
   @p_in 1
   @p_done 2
   @f_alpha 1
@@ -89,17 +92,27 @@ defmodule Gpark.Kernels.SaxpyF32 do
 
         # Two loads of 4 bytes each, one store of 4 bytes: 12 bytes moved per
         # element, and the whole kernel exists to move them.
+        IR.instr("add",
+          dtype: :u64,
+          dest: IR.reg(:u64, @rd_addr),
+          ops: [IR.reg(:u64, @rd_x), IR.reg(:u64, @rd_off)]
+        ),
         IR.instr("ld",
           dtype: :f32,
           space: :global,
           dest: IR.reg(:f32, @f_y),
-          ops: [IR.addr(IR.reg(:u64, @rd_x), IR.reg(:u64, @rd_off))]
+          ops: [IR.addr(IR.reg(:u64, @rd_addr))]
+        ),
+        IR.instr("add",
+          dtype: :u64,
+          dest: IR.reg(:u64, @rd_addr),
+          ops: [IR.reg(:u64, @rd_y), IR.reg(:u64, @rd_off)]
         ),
         IR.instr("ld",
           dtype: :f32,
           space: :global,
           dest: IR.reg(:f32, @f_t),
-          ops: [IR.addr(IR.reg(:u64, @rd_y), IR.reg(:u64, @rd_off))]
+          ops: [IR.addr(IR.reg(:u64, @rd_addr))]
         ),
 
         # alpha * x + y, fused. Splitting this into a separate multiply and add
@@ -110,10 +123,15 @@ defmodule Gpark.Kernels.SaxpyF32 do
           dest: IR.reg(:f32, @f_r),
           ops: [IR.reg(:f32, @f_alpha), IR.reg(:f32, @f_y), IR.reg(:f32, @f_t)]
         ),
+        IR.instr("add",
+          dtype: :u64,
+          dest: IR.reg(:u64, @rd_addr),
+          ops: [IR.reg(:u64, @rd_out), IR.reg(:u64, @rd_off)]
+        ),
         IR.instr("st",
           dtype: :f32,
           space: :global,
-          ops: [IR.addr(IR.reg(:u64, @rd_out), IR.reg(:u64, @rd_off)), IR.reg(:f32, @f_r)]
+          ops: [IR.addr(IR.reg(:u64, @rd_addr)), IR.reg(:f32, @f_r)]
         )
       ],
       IR.instr("ret")

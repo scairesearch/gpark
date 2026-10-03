@@ -25,6 +25,9 @@ defmodule Gpark.Kernels.VecAddF32 do
   @rd_out 3
   # byte offset
   @rd_off 4
+
+  # Materialised address, shared by all three accesses.
+  @rd_addr 5
   # n
   @r_n 1
   # global thread id == element index
@@ -102,27 +105,48 @@ defmodule Gpark.Kernels.VecAddF32 do
           dest: IR.reg(:u64, @rd_off),
           ops: [IR.reg(:u32, @r_gid), IR.imm(4)]
         ),
+        # PTX has no base+register addressing mode: `ld`/`st` accept `[reg]` or
+        # `[reg+imm]` and nothing else, so the pointer and the byte offset cannot
+        # be summed inside the addressing brackets. The sum goes into its own
+        # register first. One register is reused for all three accesses -- the
+        # addresses are not live at the same time -- which keeps this at one
+        # extra u64 per kernel rather than one per load.
+        IR.instr("add",
+          dtype: :u64,
+          dest: IR.reg(:u64, @rd_addr),
+          ops: [IR.reg(:u64, @rd_a), IR.reg(:u64, @rd_off)]
+        ),
         IR.instr("ld",
           dtype: :f32,
           space: :global,
           dest: IR.reg(:f32, @f_a),
-          ops: [IR.addr(IR.reg(:u64, @rd_a), IR.reg(:u64, @rd_off))]
+          ops: [IR.addr(IR.reg(:u64, @rd_addr))]
+        ),
+        IR.instr("add",
+          dtype: :u64,
+          dest: IR.reg(:u64, @rd_addr),
+          ops: [IR.reg(:u64, @rd_b), IR.reg(:u64, @rd_off)]
         ),
         IR.instr("ld",
           dtype: :f32,
           space: :global,
           dest: IR.reg(:f32, @f_b),
-          ops: [IR.addr(IR.reg(:u64, @rd_b), IR.reg(:u64, @rd_off))]
+          ops: [IR.addr(IR.reg(:u64, @rd_addr))]
         ),
         IR.instr("add",
           dtype: :f32,
           dest: IR.reg(:f32, @f_sum),
           ops: [IR.reg(:f32, @f_a), IR.reg(:f32, @f_b)]
         ),
+        IR.instr("add",
+          dtype: :u64,
+          dest: IR.reg(:u64, @rd_addr),
+          ops: [IR.reg(:u64, @rd_out), IR.reg(:u64, @rd_off)]
+        ),
         IR.instr("st",
           dtype: :f32,
           space: :global,
-          ops: [IR.addr(IR.reg(:u64, @rd_out), IR.reg(:u64, @rd_off)), IR.reg(:f32, @f_sum)]
+          ops: [IR.addr(IR.reg(:u64, @rd_addr)), IR.reg(:f32, @f_sum)]
         )
       ],
       IR.instr("ret")

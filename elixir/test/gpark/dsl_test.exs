@@ -73,21 +73,37 @@ defmodule Gpark.DSLTest do
     test "numbers per register class in first-definition order" do
       kernel = dsl_vec_add()
 
-      # %rd: a, b, out, then the byte offset. %r: n, then the index.
-      # %p: the guard and its negation. %f: a, b, sum.
+      # %rd: a, b, out, the byte offset, then the materialised address.
+      # %r: n, then the index. %p: the guard and its negation.
+      # %f: a, b, sum.
       assert Gpark.IR.max_regs(Enum.flat_map(kernel.blocks, & &1.instrs)) == %{
-               rd: 4,
+               rd: 5,
                r: 2,
                p: 2,
                f: 3
              }
     end
 
-    test "never reuses a register within a kernel" do
+    test "never reuses a register within a kernel, except the address scratch" do
+      instrs = dsl_vec_add() |> Map.fetch!(:blocks) |> Enum.flat_map(& &1.instrs)
+
+      # The one deliberate reuse. PTX has no base+register addressing mode, so
+      # every load and store needs its address in a register first, and the
+      # addresses are not live at the same time. This is still visible in the
+      # IR and counted by ptxas -- it is a reserved scratch, not an allocator
+      # quietly inventing registers behind the reader's back.
+      scratch =
+        instrs
+        |> Enum.filter(&(&1.base == "add" and &1.dtype == :u64))
+        |> Enum.map(& &1.dest)
+        |> Enum.uniq()
+        |> Enum.map(fn {:reg, type, id} -> {IR.reg_class(type), id} end)
+        |> Enum.uniq()
+
+      assert scratch != []
+
       written =
-        dsl_vec_add()
-        |> Map.fetch!(:blocks)
-        |> Enum.flat_map(& &1.instrs)
+        instrs
         |> Enum.map(& &1.dest)
         |> Enum.reject(&is_nil/1)
 
@@ -100,7 +116,24 @@ defmodule Gpark.DSLTest do
           {:pred, id} -> {:p, id}
         end)
 
-      assert regs == Enum.uniq(regs)
+      # Value registers are strictly single-assignment. The only repeat allowed
+      # anywhere is the address scratch, and it must be the sole exception --
+      # if anything else starts repeating, that is a bug, not a policy.
+      reused = regs -- Enum.uniq(regs)
+
+      assert Enum.uniq(reused) == scratch
+
+      # It is rewritten once per access (three here: two loads and a store), and
+      # not once per kernel, so the reuse is bounded and visible rather than a
+      # register being handed around invisibly.
+      accesses =
+        instrs
+        |> Enum.filter(&(&1.base in ["ld", "st"] and &1.space == :global))
+        |> Enum.flat_map(& &1.ops)
+        |> Enum.filter(&match?({:addr, _, _, _}, &1))
+        |> length()
+
+      assert Enum.count(regs, &(&1 == hd(scratch))) == accesses
     end
   end
 

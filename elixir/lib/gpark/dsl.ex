@@ -23,7 +23,8 @@ defmodule Gpark.DSL.Scope do
             ptrs: %{},
             index: nil,
             index_type: :u32,
-            offset: nil
+            offset: nil,
+            addr_reg: nil
 end
 
 defmodule Gpark.DSL do
@@ -196,9 +197,10 @@ defmodule Gpark.DSL do
   @spec load(Scope.t(), atom()) :: {Scope.t(), tuple()}
   def load(%Scope{} = scope, name) do
     {elem, space, _base} = fetch_ptr!(scope, name)
+    {scope, addr} = addr_of(scope, name)
 
     {scope, id} =
-      emit_dest(scope, "ld", elem, dtype: elem, space: space, ops: [addr_of(scope, name)])
+      emit_dest(scope, "ld", elem, dtype: elem, space: space, ops: [addr])
 
     {scope, IR.reg(elem, id)}
   end
@@ -207,11 +209,12 @@ defmodule Gpark.DSL do
   @spec store(Scope.t(), atom(), tuple()) :: Scope.t()
   def store(%Scope{} = scope, name, value) do
     {_elem, space, _base} = fetch_ptr!(scope, name)
+    {scope, addr} = addr_of(scope, name)
 
     emit(scope, "st",
       dtype: operand_type(value),
       space: space,
-      ops: [addr_of(scope, name), value]
+      ops: [addr, value]
     )
   end
 
@@ -272,10 +275,45 @@ defmodule Gpark.DSL do
   # Every pointer shares one byte-offset register, which is the point: for an
   # elementwise kernel the offsets are identical, so recomputing them per access
   # would be instructions for nothing.
-  defp addr_of(%Scope{offset: offset} = scope, name) do
+  #
+  # The address itself is then materialised into one dedicated register, also
+  # shared across accesses. PTX has no base+register addressing mode -- ld/st
+  # take `[reg]` or `[reg+imm]` and nothing else -- so the sum has to exist in a
+  # register before the load can name it. Reusing a single register across
+  # accesses rather than allocating one per access costs one u64 per kernel
+  # instead of one per ld/st, and the register count it produces is reported by
+  # `remote/ptxas_check.sh`, so the saving is measured rather than assumed.
+  #
+  # Allocated here rather than in the backend so it stays visible in the IR:
+  # this design does not hide allocation.
+  defp addr_of(%Scope{} = scope, name) do
     {_elem, _space, base} = fetch_ptr!(scope, name)
-    IR.addr(IR.reg(:u64, base), IR.reg(:u64, offset))
+    {scope, id} = materialize_addr(scope)
+    addr = IR.reg(:u64, id)
+
+    # Emitted on *every* access, not just the first. The register is reused,
+    # but each pointer has a different base, so hoisting this would leave the
+    # register holding the first pointer's address for all of them -- the
+    # dropped-pointer-base bug this module already guards against once.
+    scope =
+      emit(scope, "add",
+        dtype: :u64,
+        dest: addr,
+        ops: [IR.reg(:u64, base), IR.reg(:u64, scope.offset)]
+      )
+
+    {scope, IR.addr(addr)}
   end
+
+  # Allocate the address register on first use, then reuse it. `alloc/2` numbers
+  # it like any other register, so it shows up in the IR and in the ptxas
+  # register count: nothing about it is hidden from the reader or the gate.
+  defp materialize_addr(%Scope{addr_reg: nil} = scope) do
+    {scope, id} = alloc(scope, :u64)
+    {%{scope | addr_reg: id}, id}
+  end
+
+  defp materialize_addr(%Scope{addr_reg: id} = scope), do: {scope, id}
 
   defp alloc(%Scope{counter: counter} = scope, type) do
     class =

@@ -9,10 +9,19 @@
 	.param .u32 n
 )
 {
-	.reg .pred %p1<2>;
-	.reg .u32 %r2<2>;
-	.reg .u64 %rd1<4>;
-	.reg .f32 %f1<4>;
+	.reg .pred %p1;
+	.reg .pred %p2;
+	.reg .u32 %r2;
+	.reg .u32 %r3;
+	.reg .u64 %rd1;
+	.reg .u64 %rd2;
+	.reg .u64 %rd3;
+	.reg .u64 %rd4;
+	.reg .u64 %rd5;
+	.reg .f32 %f1;
+	.reg .f32 %f2;
+	.reg .f32 %f3;
+	.reg .f32 %f4;
 $L__entry:
 	ld.param.u64 %rd1, [x];
 	ld.param.u64 %rd2, [y];
@@ -24,10 +33,13 @@ $L__entry:
 	not.pred %p2, %p1;
 	@%p2 bra $L__done;
 	mul.wide.u32 %rd4, %r3, 4;
-	ld.global.f32 %f2, [%rd1+%rd4];
-	ld.global.f32 %f3, [%rd2+%rd4];
+	add.u64 %rd5, %rd1, %rd4;
+	ld.global.f32 %f2, [%rd5];
+	add.u64 %rd5, %rd2, %rd4;
+	ld.global.f32 %f3, [%rd5];
 	fma.rn.f32 %f4, %f1, %f2, %f3;
-	st.global.f32 [%rd3+%rd4], %f4;
+	add.u64 %rd5, %rd3, %rd4;
+	st.global.f32 [%rd5], %f4;
 	ret;
 $L__done:
 	ret;

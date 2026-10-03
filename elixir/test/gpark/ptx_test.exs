@@ -46,14 +46,29 @@ defmodule Gpark.PTXTest do
       assert PTX.operand(IR.sreg(:laneid)) == "%laneid"
     end
 
-    test "renders the three address forms" do
+    test "renders the two address forms PTX actually has" do
       base = IR.reg(:u64, 2)
-      idx = IR.reg(:u64, 4)
 
       assert PTX.operand(IR.addr(base)) == "[%rd2]"
       assert PTX.operand(IR.addr(base, 64)) == "[%rd2+64]"
-      assert PTX.operand(IR.addr(base, idx)) == "[%rd2+%rd4]"
-      assert PTX.operand(IR.addr(base, idx, 4)) == "[%rd2+%rd4*4]"
+    end
+
+    test "refuses a register offset instead of emitting invalid PTX" do
+      # PTX has no base+register addressing mode. Emitting one produces text
+      # that passes Gpark.Validate -- it only checks the IR -- and then fails
+      # at ptxas with "Parsing error near '%rd4'", which reads like an
+      # addressing bug in a completely different place. Refusing here keeps the
+      # mistake at the line that made it.
+      base = IR.reg(:u64, 2)
+      idx = IR.reg(:u64, 4)
+
+      assert_raise ArgumentError, ~r/a PTX addressing mode/, fn ->
+        PTX.operand(IR.addr(base, idx))
+      end
+
+      assert_raise ArgumentError, ~r/a PTX addressing mode/, fn ->
+        PTX.operand(IR.addr(base, idx, 4))
+      end
     end
   end
 
@@ -78,15 +93,25 @@ defmodule Gpark.PTXTest do
       assert ptx =~ ".target sm_80"
       assert ptx =~ ".address_size 64"
       assert ptx =~ ".visible .entry vec_add_f32("
-      assert ptx =~ ".reg .f32 %f1<3>;"
+      assert ptx =~ ".reg .f32 %f1;"
+      assert ptx =~ ".reg .f32 %f2;"
+      assert ptx =~ ".reg .f32 %f3;"
+      # Nothing past the highest register the kernel touches.
+      refute ptx =~ ".reg .f32 %f4;"
     end
 
-    test "contiguous register ids collapse into PTX runs" do
+    test "declares one register per line, never the vector form" do
       ptx = Gpark.Kernels.VecAddF32.build() |> PTX.emit()
 
-      # %rd1..%rd4 is one run, not four separate names.
-      assert ptx =~ ".reg .u64 %rd1<4>;"
-      refute ptx =~ "%rd1, %rd2"
+      # `.reg .u64 %rd1<4>;` is rejected by ptxas, and unhelpfully: the error
+      # names the first *instruction*, not the declaration, so it cascades
+      # through the whole kernel and looks like an addressing bug. One
+      # declaration per register is also the honest encoding here -- this design
+      # allocates explicitly and never reuses, so there is nothing to gain by
+      # declaring a vector.
+      assert ptx =~ ".reg .u64 %rd1;"
+      assert ptx =~ ".reg .u64 %rd2;"
+      refute ptx =~ ~r/\.reg \.[a-z0-9]+ %[a-z]+[0-9]+</
     end
   end
 

@@ -7,10 +7,17 @@
 	.param .u32 n
 )
 {
-	.reg .pred %p1<2>;
-	.reg .u32 %r1<4>;
-	.reg .u64 %rd1<2>;
-	.reg .f32 %f1<2>;
+	.reg .pred %p1;
+	.reg .pred %p2;
+	.reg .u32 %r1;
+	.reg .u32 %r2;
+	.reg .u32 %r3;
+	.reg .u64 %rd1;
+	.reg .u64 %rd2;
+	.reg .u64 %rd3;
+	.reg .u64 %rd4;
+	.reg .f32 %f1;
+	.reg .f32 %f2;
 $L__entry:
 	ld.param.u64 %rd1, [in];
 	ld.param.u64 %rd2, [out];
@@ -18,8 +25,9 @@ $L__entry:
 	mov.u32 %r2, %laneid;
 	sub.u32 %r3, %r1, 1;
 	min.u32 %r2, %r2, %r3;
-	shl.u32 %r4, %r2, 2;
-	ld.global.f32 %f1, [%rd1+%r4];
+	mul.wide.u32 %rd3, %r2, 2;
+	add.u64 %rd4, %rd1, %rd3;
+	ld.global.f32 %f1, [%rd4];
 	shfl.sync.bfly.f32 %f2, %f1, 16, 32;
 	add.f32 %f1, %f1, %f2;
 	shfl.sync.bfly.f32 %f2, %f1, 8, 32;

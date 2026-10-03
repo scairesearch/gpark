@@ -39,8 +39,11 @@ defmodule Gpark.Kernels.ReduceSumF32 do
   @r_lane 2
   # n - 1, the clamp bound
   @r_last 3
-  # byte offset
-  @r_off 4
+  # byte offset, lane * sizeof(f32), widened to 64 bits by mul.wide
+  @rd_off 3
+
+  # Materialised address for the strided load.
+  @rd_addr 4
   # lane != 0
   @p_out 1
   # lane == 0
@@ -99,16 +102,25 @@ defmodule Gpark.Kernels.ReduceSumF32 do
           dest: IR.reg(:u32, @r_lane),
           ops: [IR.reg(:u32, @r_lane), IR.reg(:u32, @r_last)]
         ),
-        IR.instr("shl",
+        IR.instr("mul.wide",
           dtype: :u32,
-          dest: IR.reg(:u32, @r_off),
+          dest: IR.reg(:u64, @rd_off),
           ops: [IR.reg(:u32, @r_lane), IR.imm(2)]
+        ),
+        # PTX ld/st take [reg] or [reg+imm] only, so the base and the offset
+        # cannot be summed inside the brackets. `mul.wide` does the widening as
+        # part of the multiply, so the offset is already 64-bit here and `add`
+        # gets two operands of the same width.
+        IR.instr("add",
+          dtype: :u64,
+          dest: IR.reg(:u64, @rd_addr),
+          ops: [IR.reg(:u64, @rd_in), IR.reg(:u64, @rd_off)]
         ),
         IR.instr("ld",
           dtype: :f32,
           space: :global,
           dest: IR.reg(:f32, @f_v),
-          ops: [IR.addr(IR.reg(:u64, @rd_in), IR.reg(:u32, @r_off))]
+          ops: [IR.addr(IR.reg(:u64, @rd_addr))]
         )
       ] ++
         rounds() ++
